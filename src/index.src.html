@@ -46,11 +46,12 @@ h1{font-family:var(--serif);font-weight:400;font-style:italic;font-size:30px;let
 .ring,.twin,.read{visibility:hidden}
 body.laid .ring,body.laid .twin,body.laid .read{visibility:visible}
 .ring canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.passage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;width:62%;
+.passage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;width:max-content;
   font:400 12px/1.5 var(--sans);color:var(--dim);white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;letter-spacing:.005em}
+.passage.below{top:100%;left:0;right:0;transform:none;width:auto;max-width:none!important;margin:14px 0 0;padding:0 max(16px,env(safe-area-inset-left))}
 .passage .m{color:#333}
 .passage .n{color:var(--accent)}
-.passage .r{color:#555;text-decoration:line-through;text-decoration-color:var(--accent)}
+.passage .r{color:#9a9a9a;text-decoration:line-through;text-decoration-color:var(--accent);text-decoration-thickness:1.5px}
 .twin{position:fixed;left:0;top:0;width:10px}
 .twin h2{margin:0 0 2px;font:italic 400 17px/1.2 var(--serif);color:var(--fg)}
 .twin .sub{margin:0 0 14px;font-size:11px;letter-spacing:.04em;color:var(--mute)}
@@ -93,6 +94,9 @@ button{font:500 13px/1 var(--sans);letter-spacing:.02em;border:0;border-radius:9
 .ghost{color:var(--dim);background:none;box-shadow:inset 0 0 0 1px #2a2a2a}
 .ghost:hover{color:var(--fg);box-shadow:inset 0 0 0 1px #4a4a4a}
 .ghost[aria-pressed="true"]{color:var(--accent);background:var(--accent-soft);box-shadow:none}
+.tog::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin:0 8px 0 -2px;vertical-align:0;box-shadow:inset 0 0 0 1px currentColor}
+.tog[aria-pressed="true"]{color:var(--fg);background:none;box-shadow:inset 0 0 0 1px #2a2a2a}
+.tog[aria-pressed="true"]::before{background:var(--accent);box-shadow:none}
 button:disabled{opacity:.4;cursor:default}
 :focus-visible{outline:1px solid var(--accent);outline-offset:2px}
 
@@ -132,7 +136,7 @@ button:disabled{opacity:.4;cursor:default}
   .meta .wide{display:none}
   .made{margin-top:0}
   .ring{position:relative;margin:8px auto 0}
-  .passage{font-size:10.5px;line-height:1.45;width:64%}
+  .passage{line-height:1.45}
   .twin{position:relative;width:auto!important;left:auto!important;top:auto!important;margin:18px max(16px,env(safe-area-inset-left)) 0}
   .twin canvas{display:none}
   .twin .sub{margin-bottom:6px}
@@ -211,9 +215,9 @@ button:disabled{opacity:.4;cursor:default}
     <output id="stepout" for="step">0 / 32</output>
   </div>
   <div class="row">
-    <button id="write">Write</button>
+    <button id="write" disabled>Loading</button>
     <button id="compare" class="ghost">Compare</button>
-    <button id="remask" class="ghost" aria-pressed="true">Remasking</button>
+    <button id="remask" class="ghost tog" aria-pressed="true">Remasking</button>
     <span class="scrub"><label for="k">K</label><input type="range" id="k" min="0" max="4" value="2" step="1" aria-valuetext="32 passes"><output id="kout" for="k">32</output></span>
   </div>
 </div>
@@ -234,14 +238,14 @@ button:disabled{opacity:.4;cursor:default}
     <tr><th scope="row">training time</th><td id="p-sd"></td><td id="p-sg"></td></tr>
   </table>
   <p id="p-arch"></p>
-  <p><b>The diffusion model</b> (absorbing-state masked diffusion, as in MDLM) learns by having a random share of a passage replaced with blanks, anywhere from none to all of it, and guessing them all at once from both sides. Its loss is an upper bound (an ELBO), so its true loss may be lower than the number above: that comparison favours the GPT.</p>
-  <p><b>Writing.</b> The diffusion model runs K passes. Each pass reads all 256 positions and draws a letter for every blank; a random set of those letters is kept, so that after pass <i>s</i> about 255·<i>s</i>/K are written (MDLM's own order). Keeping the letters it was most sure of instead (as LLaDA does) made this small model fill the ring with its safest word, “you you you”, so the page does not. With remasking on, in the middle half of the run a few of the least confident earlier letters go back to blank to be guessed again with more context (confidence-based remasking, after ReMDM). The GPT runs 255 passes, each adding one letter after the last, with a cache so it never rereads. Both sample at temperature 0.8, with the same seed.</p>
+  <p><b>The diffusion model</b> (absorbing-state masked diffusion, as in MDLM) learns by having a random share of a passage replaced with blanks, anywhere from none to all of it, and guessing them all at once from both sides. Its loss is an upper bound (an ELBO, estimated on 400 validation passages), so its true loss may be lower than the number above: that comparison favours the GPT.</p>
+  <p><b>Writing.</b> The diffusion model runs K passes. Each pass reads all 256 positions and draws a letter for every blank; a random set of those letters is kept, so that after pass <i>s</i> about 255·<i>s</i>/K are written (random order, as in MDLM's sampler). Keeping the letters it was most sure of instead (as LLaDA does) made this small model fill the ring with its safest word, “you you you”. We saw that first, so the page uses random order, and the variety check below was added after seeing it. With remasking on, in the middle half of the run a few of the least confident earlier letters go back to blank to be guessed again with more context (confidence-based remasking, after ReMDM). The GPT runs 255 passes, each adding one letter after the last, with a cache so it never rereads. Both sample at temperature 0.8, with the same seed.</p>
   <h3>The numbers, and how they were measured</h3>
-  <p><b>Passes</b> are network runs, one after another. <b>Time</b> is measured live in this browser: the compute time of each model's run, in a background worker. <b>Real words</b> is the share of the words a model writes (runs of letters) that appear anywhere in tiny-shakespeare, over seeds 1–50, measured with this page's own code and weights, not live.</p>
+  <p><b>Passes</b> are network runs, one after another. <b>Time</b> is measured live in this browser: the compute time of each model's run, in a background worker. <b>Real words</b> is the share of the words a model writes (runs of letters, inner apostrophes allowed) that appear anywhere in tiny-shakespeare, over seeds 1–50, measured with this page's own code and weights, not live.</p>
   <p id="p-k"></p>
   <p>The ring is drawn live as the passes are computed, at least 90 ms per pass so it can be watched. <b>Compare</b> replays both runs side by side, one pass per tick, so you see the count of passes, not their cost. The real times are in the readout.</p>
   <h3>Limits</h3>
-  <p>Fewer passes do not mean faster here. Each diffusion pass reads every position, while a GPT pass reads one new letter, so on a CPU the GPT finishes first. Diffusion pays off only on hardware that runs a whole pass at once, like a GPU, and on models large enough to keep it busy. Both models are under a million parameters with 256 letters of context: they get Shakespeare's shape, not its sense.</p>
+  <p>Fewer passes do not mean faster here. Each diffusion pass reads every position, while a GPT pass reads one new letter, so on a CPU the GPT finishes first. Diffusion can pay off on hardware that runs a whole pass at once, like a GPU, with models large enough to keep it busy; that is not measured here. Both models are under a million parameters with 256 letters of context: they get Shakespeare's shape, not its sense.</p>
   <p class="keys"><kbd>Space</kbd> write · <kbd>C</kbd> compare · <kbd>&larr;</kbd> <kbd>&rarr;</kbd> step through the passes · <kbd>Esc</kbd> close</p>
   <div class="refs">
     <h3>Sources</h3>
@@ -391,42 +395,71 @@ function drawGlyph(ctx, c, ox, oy, ux, uy, s, grow) {
 
 // ---------- layout ---------------------------------------------------------------------------------
 const ringbox = $("ringbox"), ringC = $("ring"), twinbox = $("twinbox"), twinC = $("twin");
+const passage = $("passage"), twintxt = $("twintxt");
 let L = { R: 200, size: 500, s: 1, mobile: false, dpr: 1 };
 function layout() {
   const W = innerWidth, H = innerHeight, mobile = W <= 720, short = H <= 500 && W > 720;
   const dpr = Math.min(2, devicePixelRatio || 1);
   const head = document.querySelector("header > div").getBoundingClientRect();
-  const dock = $("dock").getBoundingClientRect();
+  const dockEl = $("dock"), readEl = $("read");
+  dockEl.style.width = ""; readEl.style.left = readEl.style.top = readEl.style.bottom = readEl.style.width = "";
+  let dock = dockEl.getBoundingClientRect();
   document.documentElement.style.setProperty("--dock-h", Math.round(dock.height) + "px");
   let size, cx, cy;
   if (mobile) {
     const avail = H - document.querySelector("header").getBoundingClientRect().bottom - dock.height - 16;
-    size = Math.max(250, Math.min(W - 16, 460, avail));
+    size = Math.max(200, Math.min(W - 16, 460, avail));
     ringbox.style.left = ringbox.style.top = "";
+  } else if (short) {
+    // phone on its side: readout bottom-left, ring in the middle clear of it, twin on the right
+    const read = readEl.getBoundingClientRect();
+    const top = 10, bottom = dock.top - 10;
+    size = Math.max(200, bottom - top);
+    cx = Math.max(W * .47, read.right + 16 + size / 2);
+    cy = top + size / 2;
   } else {
-    const top = short ? 10 : head.bottom + 8, bottom = dock.top - (short ? 6 : 12);
-    const leftW = W * (short ? .5 : .6);
-    size = Math.max(220, Math.min(bottom - top, leftW - 40));
-    cx = short ? W * .47 : Math.max(size / 2 + 32, W * .34);
-    cy = short ? H * .5 : top + (bottom - top) / 2;
+    // desktop: the ring on the left with the controls centred under it; the twin and the readout on the right
+    cx = Math.max(W * .34, 32 + 160);
+    dockEl.style.width = Math.round(Math.min(W, 2 * cx)) + "px";
+    dock = dockEl.getBoundingClientRect();
+    const top = head.bottom + 8, bottom = dock.top - 12;
+    size = Math.max(220, Math.min(bottom - top, 2 * (cx - 32), W * .6 - 40));
+    cx = Math.max(cx, 32 + size / 2);
+    cy = top + (bottom - top) / 2;
+  }
+  if (!mobile) {
     ringbox.style.left = Math.round(cx - size / 2) + "px";
     ringbox.style.top = Math.round(cy - size / 2) + "px";
   }
   ringbox.style.width = ringbox.style.height = Math.round(size) + "px";
   ringC.width = ringC.height = Math.round(size * dpr);
   const R = size * .39;
-  L = { R, size, s: R / 300, mobile, short, dpr };
-  $("passage").style.width = Math.round(R * 1.5) + "px";
-  $("passage").style.fontSize = (mobile ? Math.max(10, R / 15) : Math.min(12.5, Math.max(10.5, R / 24))) + "px";
-  // the twin: right column on desktop, below the ring on phones
+  L = { R, size, s: R / 300, mobile, short, dpr, textRing: !mobile && R > 150 };
+  passage.style.fontSize = "";
+  L.fs = mobile || short ? Math.max(9, Math.min(11, R / 12.5)) : Math.min(12.5, Math.max(10.5, R / 24));
+  L.rin = R - (L.textRing ? 13 * Math.max(.8, L.s) + 12 : 12);
+  passage.style.maxWidth = Math.round(L.rin * 1.42) + "px";
+  L.below = mobile && R < 95;            // too small a ring to hold the text: put it underneath
+  passage.classList.toggle("below", L.below);
+  if (L.below) L.fs = 12;
+  fitPassage(true);
+  ringbox.style.marginBottom = L.below ? passage.offsetHeight + 14 + "px" : "";
   if (!mobile) {
-    const ringRight = parseFloat(ringbox.style.left) + size;
-    const x0 = short ? ringRight + 16 : Math.max(ringRight + 24, W * .62);
-    const w = short ? Math.min(260, W - x0 - Math.max(24, parseFloat(getComputedStyle(document.querySelector("header")).paddingRight))) : Math.min(440, W - x0 - 32);
+    const ringRight = cx + size / 2;
+    const pad = Math.max(24, parseFloat(getComputedStyle(document.querySelector("header")).paddingRight));
+    const x0 = short ? ringRight + 16 : Math.max(ringRight + 32, W * .6);
+    const w = short ? Math.min(260, W - x0 - pad) : Math.min(440, W - x0 - 32);
     twinbox.style.width = w + "px";
     twinbox.style.left = x0 + "px";
-    twinbox.style.display = w < 200 ? "none" : "";
-    const cell = w / 32, avail = dock.top - 16 - (short ? 64 : head.bottom + 24);
+    twinbox.style.display = w < 190 ? "none" : "";
+    const metaB = document.querySelector(".meta").getBoundingClientRect().bottom;
+    const top0 = short ? metaB + 12 : head.bottom + 24;
+    let readH = 0;
+    if (!short) {                              // the readout sits under the twin
+      readEl.style.left = x0 + "px"; readEl.style.width = w + "px"; readEl.style.bottom = "auto";
+      readH = readEl.getBoundingClientRect().height + 24;
+    }
+    const cell = w / 32, avail = (short ? dock.top : H - 26) - 16 - top0 - readH;
     let f = 3.1, th = 0;
     for (f of [3.1, 2.7, 2.35, 2.0, 1.7]) {
       const ch = Math.round(cell * f * 8);
@@ -435,15 +468,23 @@ function layout() {
       th = twinbox.getBoundingClientRect().height;
       if (th <= avail) break;
     }
-    L.rowF = f;
-    const mid = (cy || H / 2) - th / 2;
-    twinbox.style.top = Math.round(short ? 64 : Math.max(head.bottom + 24, Math.min(mid, dock.top - 16 - th))) + "px";
-    L.cell = cell;
+    L.rowF = f; L.cell = cell;
+    const t = short ? top0 : Math.max(top0, Math.min(cy - (th + readH) / 2, H - 26 - th - readH));
+    twinbox.style.top = Math.round(t) + "px";
+    if (!short) readEl.style.top = Math.round(t + th + 24) + "px";
   } else {
     twinbox.style.display = "";
   }
   document.body.classList.add("laid");
   draw(performance.now());
+}
+// keep the plain passage inside the ring: shrink the type until it fits the inner circle
+function fitPassage(reset) {
+  let fs = reset ? L.fs : parseFloat(passage.style.fontSize) || L.fs;
+  passage.style.fontSize = fs + "px";
+  if (L.below) { ringbox.style.marginBottom = passage.offsetHeight + 14 + "px"; return; }
+  const maxH = L.rin * 1.36;
+  while (passage.offsetHeight > maxH && fs > 7) { fs -= .5; passage.style.fontSize = fs + "px"; }
 }
 
 // ---------- drawing --------------------------------------------------------------------------------
@@ -491,7 +532,7 @@ function draw(now) {
     ctx.globalAlpha = 1;
   }
   // the plain text ring just inside (desktop only; on a phone it would be too small to read)
-  if (!L.mobile && R > 150) {
+  if (L.textRing) {
     const rt = R - 13 * Math.max(.8, s);
     ctx.font = `400 ${Math.max(8, Math.min(10.5, R / 30)).toFixed(1)}px Inter, "Inter fallback", sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
@@ -502,7 +543,7 @@ function draw(now) {
       ctx.save();
       ctx.translate(c + Math.cos(th) * rt, c + Math.sin(th) * rt);
       ctx.rotate(th + Math.PI / 2);
-      ctx.fillStyle = p.fresh ? ACC : "#6a6660";
+      ctx.fillStyle = p.fresh ? ACC : "#8a857e";
       ctx.fillText(ch, 0, 0);
       ctx.restore();
     }
@@ -524,7 +565,7 @@ function drawTwin(now) {
     const ox = col * cell + cell / 2, oy = row * rowH + rowH * .82;
     const p = gpos[i];
     if (p.c === MASK) {
-      ctx.fillStyle = "rgba(181,175,165,.13)";
+      ctx.fillStyle = S.comparing || S.gshown ? "rgba(181,175,165,.13)" : "rgba(181,175,165,.07)"; // blanks waiting
       ctx.beginPath(); ctx.arc(ox, oy - 4 * s, 2.2 * s + .5, 0, 7); ctx.fill();
       continue;
     }
@@ -539,7 +580,6 @@ function drawTwin(now) {
 }
 
 // ---------- text views -------------------------------------------------------------------------------
-const passage = $("passage"), twintxt = $("twintxt");
 const esc = (ch) => ch === "<" ? "&lt;" : ch === "&" ? "&amp;" : ch === ">" ? "&gt;" : ch;
 function renderPassage() {
   let h = "";
@@ -549,6 +589,7 @@ function renderPassage() {
     else h += p.fresh ? `<span class="n">${esc(CHARS[p.c])}</span>` : esc(CHARS[p.c]);
   }
   passage.innerHTML = h;
+  if (L.rin) fitPassage(false);
 }
 function renderTwinText() {
   let h = "";
@@ -634,6 +675,7 @@ function compare() {
   stopTimers();
   S.comparing = true;
   $("compare").setAttribute("aria-pressed", "true");
+  if (L.mobile) twinbox.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
   if (reduce) { showPass(S.K, false); showLetters(N - 1, false); endCompare(); return; }
   showPass(0, false); showLetters(0, false);
   let t = 0;
@@ -659,10 +701,14 @@ function setBusy(b) {
   $("write").textContent = b ? "Writing" : "Write";
   $("step").disabled = b; $("compare").disabled = b;
 }
+worker.onerror = (e) => {
+  $("write").textContent = "Write"; $("write").disabled = true; $("compare").disabled = true;
+  $("note").textContent = "The models could not start in this browser" + (e && e.message ? ": " + e.message : ".");
+};
 
 worker.onmessage = (e) => {
   const m = e.data;
-  if (m.type === "ready") { S.ready = true; write(false); return; }
+  if (m.type === "ready") { S.ready = true; $("write").disabled = false; write(false); return; }
   if (m.id !== S.id) return;
   if (m.type === "dstep") {
     S.traj.push({ x: m.x, committed: m.committed, remasked: m.remasked });
@@ -705,7 +751,7 @@ function updateMeta() {
 function fillPanel() {
   const d = STATS.diffusion, g = STATS.gpt, mins = (s) => `${Math.round(s / 60)} min`;
   $("p-pd").textContent = d.params.toLocaleString("en-US"); $("p-pg").textContent = g.params.toLocaleString("en-US");
-  $("p-vd").textContent = `≤ ${d.val_int8.toFixed(2)}`; $("p-vg").textContent = g.val_int8.toFixed(2);
+  $("p-vd").textContent = `≈ ${d.val_int8.toFixed(2)} (bound)`; $("p-vg").textContent = g.val_int8.toFixed(2);
   $("p-sd").textContent = mins(d.seconds); $("p-sg").textContent = mins(g.seconds);
   $("p-arch").textContent = `4 layers, 4 heads, 128 wide, 256 letters of context, a 66-symbol vocabulary (65 characters and a blank). Trained ${STATS.train.steps.toLocaleString("en-US")} steps of 64 passages each with AdamW on an ${STATS.train.device}; the best checkpoint by validation loss is kept, then rounded to 8-bit integers (${Math.round((d.q8_bytes + g.q8_bytes) / 1000).toLocaleString("en-US")} kB for both, inside this page).`;
   const rows = KS.map((k) => { const a = STATS.wordrate[k + "r"], b = STATS.wordrate[String(k)]; return `${k}: ${pct(a.diffusion)}${b ? ` (${pct(b.diffusion)} without remasking)` : ""}`; });
