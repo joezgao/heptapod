@@ -1,0 +1,99 @@
+{
+ "8": {
+  "diffusion": 0.5129533678756477,
+  "words": [
+   1287,
+   2509
+  ],
+  "distinct": 0.907885236534867,
+  "remasksPerRun": 0
+ },
+ "16": {
+  "diffusion": 0.5571428571428572,
+  "words": [
+   1404,
+   2520
+  ],
+  "distinct": 0.9054117899823919,
+  "remasksPerRun": 0
+ },
+ "32": {
+  "diffusion": 0.6062155782848151,
+  "words": [
+   1541,
+   2542
+  ],
+  "distinct": 0.870713604248208,
+  "remasksPerRun": 0
+ },
+ "64": {
+  "diffusion": 0.6012708498808578,
+  "words": [
+   1514,
+   2518
+  ],
+  "distinct": 0.8866294605751591,
+  "remasksPerRun": 0
+ },
+ "128": {
+  "diffusion": 0.6174496644295302,
+  "words": [
+   1564,
+   2533
+  ],
+  "distinct": 0.8707868643395368,
+  "remasksPerRun": 0
+ },
+ "seeds": 50,
+ "gpt": 0.9718482252141983,
+ "gptWords": [
+  2382,
+  2451
+ ],
+ "gptDistinct": 0.8221847639124178,
+ "128r": {
+  "diffusion": 0.7304832713754646,
+  "words": [
+   1965,
+   2690
+  ],
+  "distinct": 0.7908299530133802,
+  "remasksPerRun": 63
+ },
+ "64r": {
+  "diffusion": 0.6783513097072419,
+  "words": [
+   1761,
+   2596
+  ],
+  "distinct": 0.842072583308966,
+  "remasksPerRun": 32
+ },
+ "32r": {
+  "diffusion": 0.651369070574624,
+  "words": [
+   1689,
+   2593
+  ],
+  "distinct": 0.8487979190823022,
+  "remasksPerRun": 32
+ },
+ "16r": {
+  "diffusion": 0.6006168080185043,
+  "words": [
+   1558,
+   2594
+  ],
+  "distinct": 0.8670531444069579,
+  "remasksPerRun": 32
+ },
+ "8r": {
+  "diffusion": 0.5287267080745341,
+  "words": [
+   1362,
+   2576
+  ],
+  "distinct": 0.8983558478940943,
+  "remasksPerRun": 32
+ }
+}

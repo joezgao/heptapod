@@ -1,0 +1,18 @@
+{
+ "diffusion": {
+  "params": 829952,
+  "best_step": 19750,
+  "val_fp32": 1.933,
+  "val_int8": 1.9335,
+  "q8_bytes": 827648,
+  "f32_bytes": 28936
+ },
+ "gpt": {
+  "params": 829952,
+  "best_step": 13000,
+  "val_fp32": 1.4514,
+  "val_int8": 1.4515,
+  "q8_bytes": 827648,
+  "f32_bytes": 28936
+ }
+}

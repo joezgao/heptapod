@@ -1,0 +1,7 @@
+{
+ "kind": "diffusion",
+ "params": 829952,
+ "steps": 20000,
+ "best_val": 1.9328481793403625,
+ "seconds": 1116
+}

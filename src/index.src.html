@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Heptapod</title>
+<meta name="description" content="A tiny diffusion language model writes a whole passage at once into a circle, beside a GPT of the same size that writes one letter at a time. Both trained from scratch on Shakespeare, both running in your browser.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Ccircle cx='8' cy='8' r='5' fill='none' stroke='%238a8cff' stroke-width='1.6'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&family=Inter:wght@400;500&display=swap" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&family=Inter:wght@400;500&display=swap"></noscript>
+<style>
+@font-face{font-family:"Inter fallback";src:local("Arial"),local("ArialMT");size-adjust:106.8%;ascent-override:90.4%;descent-override:22.5%;line-gap-override:0%}
+@font-face{font-family:"Lora fallback";font-style:italic;src:local("Georgia Italic"),local("Georgia-Italic");size-adjust:99.7%}
+:root{
+  --bg:#000; --fg:#efefef; --dim:#8b8b8b; --mute:#767676; --faint:#3b3b3b; --line:#1c1c1c;
+  --accent:#8a8cff; --accent-soft:rgba(138,140,255,.13);
+  --ink:#b5afa5;
+  --serif:"Lora","Lora fallback",Georgia,"Times New Roman",serif;
+  --sans:"Inter","Inter fallback",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#000; --fg:#efefef; } }
+:root[data-theme="dark"]{ --bg:#000; --fg:#efefef; }
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);overflow:hidden}
+body{font-family:var(--sans);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+
+header{position:fixed;top:0;left:0;right:0;padding:max(28px,env(safe-area-inset-top)) max(32px,env(safe-area-inset-right)) 0 max(32px,env(safe-area-inset-left));pointer-events:none;z-index:2;
+  display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+h1{font-family:var(--serif);font-weight:400;font-style:italic;font-size:30px;letter-spacing:-.01em;margin:0 0 12px;line-height:1.1}
+.caption{margin:0;max-width:480px;font-size:13px;line-height:1.62;color:var(--dim)}
+.caption b{color:var(--fg);font-weight:500}
+.meta{font-size:11px;letter-spacing:.04em;color:var(--mute);text-align:right;line-height:1.7;white-space:nowrap;font-variant-numeric:tabular-nums}
+.meta span{color:var(--dim)}
+.made{position:relative;pointer-events:auto;font:inherit;letter-spacing:inherit;color:var(--mute);background:none;border:0;padding:0;margin-top:4px;cursor:pointer;
+  border-radius:0;text-decoration:underline;text-decoration-color:#2e2e2e;text-underline-offset:3px;transition:color .25s}
+.made::after{content:"";position:absolute;inset:-13px -8px}
+.made:hover,.made[aria-expanded="true"]{color:var(--fg)}
+
+/* the two writers */
+.ring{position:fixed;left:0;top:0;width:10px;height:10px}
+/* placed by script; hidden until then so nothing visibly jumps */
+.ring,.twin,.read{visibility:hidden}
+body.laid .ring,body.laid .twin,body.laid .read{visibility:visible}
+.ring canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.passage{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;width:62%;
+  font:400 12px/1.5 var(--sans);color:var(--dim);white-space:pre-wrap;overflow-wrap:anywhere;text-align:left;letter-spacing:.005em}
+.passage .m{color:#333}
+.passage .n{color:var(--accent)}
+.passage .r{color:#555;text-decoration:line-through;text-decoration-color:var(--accent)}
+.twin{position:fixed;left:0;top:0;width:10px}
+.twin h2{margin:0 0 2px;font:italic 400 17px/1.2 var(--serif);color:var(--fg)}
+.twin .sub{margin:0 0 14px;font-size:11px;letter-spacing:.04em;color:var(--mute)}
+.twin canvas{display:block;width:100%}
+.twin .txt{margin:12px 0 0;font:400 11.5px/1.5 var(--sans);color:var(--dim);white-space:pre-wrap;overflow-wrap:anywhere;height:18em;overflow:hidden}
+.twin .txt .m{color:#333}
+.twin .txt .n{color:var(--accent)}
+.twin .txt .hint{color:var(--mute)}
+
+/* the readout, bottom-left */
+.read{position:fixed;left:max(32px,env(safe-area-inset-left));bottom:max(26px,env(safe-area-inset-bottom));width:330px;z-index:2;font-variant-numeric:tabular-nums}
+.read table{border-collapse:collapse;font-size:11px;letter-spacing:.03em;width:100%}
+.read th{font-weight:400;color:var(--mute);text-align:right;padding:0 0 4px}
+.read th:first-child,.read tbody th{text-align:left;color:var(--mute);font-weight:400;padding:2px 0}
+.read td{color:var(--dim);text-align:right;padding:2px 0}
+.read td:first-child{color:var(--mute);text-align:left}
+.read td.d{color:var(--fg)}
+.read .note{margin:8px 0 0;font-size:11px;line-height:1.55;color:var(--mute)}
+.read .note b{color:var(--dim);font-weight:500}
+
+/* controls, bottom centre */
+.dock{position:fixed;left:0;right:0;bottom:0;padding:0 max(32px,env(safe-area-inset-right)) max(26px,env(safe-area-inset-bottom)) max(32px,env(safe-area-inset-left));
+  display:flex;flex-direction:column;align-items:center;gap:12px;pointer-events:none;z-index:3}
+.row{pointer-events:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.scrub{pointer-events:auto;display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.04em;color:var(--mute);font-variant-numeric:tabular-nums}
+.scrub output{min-width:92px;color:var(--dim)}
+.scrub label{display:flex;align-items:center;gap:10px}
+input[type=range]{-webkit-appearance:none;appearance:none;background:none;width:220px;height:24px;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:#2a2a2a;border-radius:1px}
+input[type=range]::-moz-range-track{height:2px;background:#2a2a2a;border-radius:1px}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;margin-top:-5px;border-radius:50%;background:var(--fg)}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border:0;border-radius:50%;background:var(--fg)}
+input[type=range]:disabled{opacity:.35;cursor:default}
+#k{width:110px}
+button{font:500 13px/1 var(--sans);letter-spacing:.02em;border:0;border-radius:999px;cursor:pointer;padding:11px 18px;
+  transition:opacity .25s,color .25s,background .25s,box-shadow .25s}
+#write{color:#000;background:var(--accent)}
+#write:hover{opacity:.88}
+#write[aria-busy="true"]{background:transparent;color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.ghost{color:var(--dim);background:none;box-shadow:inset 0 0 0 1px #2a2a2a}
+.ghost:hover{color:var(--fg);box-shadow:inset 0 0 0 1px #4a4a4a}
+.ghost[aria-pressed="true"]{color:var(--accent);background:var(--accent-soft);box-shadow:none}
+button:disabled{opacity:.4;cursor:default}
+:focus-visible{outline:1px solid var(--accent);outline-offset:2px}
+
+.panel{position:fixed;top:max(24px,env(safe-area-inset-top));right:max(24px,env(safe-area-inset-right));width:min(420px,calc(100% - 32px));max-height:calc(100% - 48px);overflow:auto;
+  padding:22px 24px 20px;background:rgba(8,8,8,.94);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid #1f1f1f;border-radius:12px;opacity:0;transform:translateY(-4px);pointer-events:none;visibility:hidden;
+  transition:opacity .3s,transform .3s,visibility 0s linear .3s;z-index:5;overscroll-behavior:contain}
+.panel.on{opacity:1;transform:none;pointer-events:auto;visibility:visible;transition:opacity .3s,transform .3s}
+.panel h2{margin:0 0 4px;font:italic 400 20px/1.2 var(--serif);color:var(--fg);outline:0}
+.panel h3{margin:16px 0 4px;font:500 10.5px/1.3 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.panel p{margin:0 0 6px;font-size:12.5px;line-height:1.6;color:var(--dim)}
+.panel p b{color:var(--fg);font-weight:500}
+.panel table{width:100%;border-collapse:collapse;font-size:11.5px;font-variant-numeric:tabular-nums;margin:4px 0 8px}
+.panel th{font-weight:500;color:var(--mute);text-align:right;padding:4px 0 5px;border-bottom:1px solid #1c1c1c}
+.panel td{color:var(--dim);text-align:right;padding:3px 0;border-bottom:1px solid #121212}
+.panel th:first-child,.panel td:first-child,.panel th[scope=row]{text-align:left}
+.panel th[scope=row]{font-weight:400;color:var(--mute);border-bottom:1px solid #121212;padding:3px 0}
+.panel .refs p{font-size:11.5px}
+.panel .keys{font-size:11.5px;color:var(--mute)}
+.panel kbd{font:500 10.5px var(--sans);color:var(--dim);border:1px solid #2a2a2a;border-radius:4px;padding:1px 5px}
+.panel a{color:var(--dim);text-decoration-color:#3a3a3a;text-underline-offset:2px}
+.panel a:hover{color:var(--fg)}
+.panel .close{position:absolute;top:7px;right:7px;width:44px;height:44px;padding:0;font-size:17px;line-height:44px;color:var(--mute);background:none}
+.panel .close:hover{color:var(--fg)}
+.panel .credit{margin:14px 0 0;padding-top:10px;border-top:1px solid #161616;font:italic 400 12.5px/1.4 var(--serif);color:#8e8e8e}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.fallback{position:fixed;inset:0;display:none;place-items:center;color:var(--dim);font-size:13px;padding:32px 16px;text-align:center}
+
+@media (max-width:1100px){ .read{width:280px} }
+@media (max-width:720px){
+  html,body{overflow-x:hidden;overflow-y:auto;height:auto}
+  header{position:relative;padding:max(18px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) 0 max(16px,env(safe-area-inset-left));flex-direction:column;gap:4px;pointer-events:auto}
+  h1{font-size:25px;margin-bottom:8px}
+  .caption{font-size:12.5px;line-height:1.55;max-width:none}
+  .caption .wide{display:none}
+  .meta{text-align:left;white-space:normal;font-size:10.5px;display:flex;gap:0 12px;flex-wrap:wrap;align-items:baseline}
+  .meta .wide{display:none}
+  .made{margin-top:0}
+  .ring{position:relative;margin:8px auto 0}
+  .passage{font-size:10.5px;line-height:1.45;width:64%}
+  .twin{position:relative;width:auto!important;left:auto!important;top:auto!important;margin:18px max(16px,env(safe-area-inset-left)) 0}
+  .twin canvas{display:none}
+  .twin .sub{margin-bottom:6px}
+  .twin .txt{margin-top:0;font-size:11.5px;height:auto}
+  .twin .sub,.read table,.read .note,.twin .txt{font-size:12px}
+  .panel .refs p,.panel .keys,.panel table{font-size:12px}
+  .read{position:relative;left:auto;bottom:auto;width:auto;margin:18px max(16px,env(safe-area-inset-left)) 0;
+    padding-bottom:calc(var(--dock-h,120px) + 16px)}
+  .dock{padding:12px max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));gap:10px;
+    background:linear-gradient(to bottom,rgba(0,0,0,0),#000 14px);position:fixed}
+  button{padding:10px 13px;font-size:12.5px}
+  input[type=range]{width:min(200px,calc(100vw - 150px))}
+  #k{width:80px}
+  .panel{top:auto;bottom:max(16px,env(safe-area-inset-bottom));right:max(16px,env(safe-area-inset-right));max-height:min(78%,calc(100% - 32px));position:fixed}
+}
+@media (max-height:500px) and (min-width:721px){
+  header{padding-top:max(14px,env(safe-area-inset-top));padding-left:max(24px,env(safe-area-inset-left));padding-right:max(24px,env(safe-area-inset-right))}
+  h1{font-size:24px;margin:0 0 4px}
+  .caption .wide,.caption .long{display:none}
+  .caption{font-size:12px;line-height:1.5}
+  .meta .wide{display:none}
+  .caption{max-width:230px}
+  .read{bottom:calc(var(--dock-h,50px) + 8px);width:230px}
+  .read .note{display:none}
+  .dock{padding-bottom:max(10px,env(safe-area-inset-bottom));gap:6px 14px;flex-direction:row;justify-content:center;flex-wrap:wrap}
+  .dock input[type=range]{width:150px}
+  .twin .txt{display:none}
+  .panel{top:max(12px,env(safe-area-inset-top));max-height:calc(100% - 24px)}
+}
+@media (pointer:coarse){
+  .row button{position:relative}
+  .row button::after{content:"";position:absolute;left:0;right:0;top:-5px;bottom:-5px}
+  input[type=range]{height:36px}
+}
+@media (pointer:coarse),(hover:none){ .keys{display:none} }
+@media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important} }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Heptapod</h1>
+    <p class="caption">Can a language model write a whole passage at once? A tiny <b>diffusion</b> model starts from 255 blanks and fills them in everywhere over a few passes, sometimes taking a letter back. <span class="long">Beside it, a <b>GPT</b> of exactly the same size writes the same length one letter at a time.</span> <span class="wide">Both were trained from scratch on Shakespeare and run here, in your browser.</span></p>
+  </div>
+  <div class="meta"><div id="meta"></div><button class="made" id="made" aria-expanded="false" aria-controls="panel">How it works</button></div>
+</header>
+
+<div class="ring" id="ringbox">
+  <canvas id="ring" role="img" aria-label="A ring of 256 positions. Each blank is a faint smudge; each letter the diffusion model commits becomes a short brush stroke drawn from that letter."></canvas>
+  <p class="passage" id="passage" aria-label="The diffusion model's passage"></p>
+</div>
+
+<section class="twin" id="twinbox" aria-labelledby="twin-h">
+  <h2 id="twin-h">The GPT twin</h2>
+  <p class="sub" id="twinsub">Same network, causal mask: one letter per pass.</p>
+  <canvas id="twin" aria-hidden="true"></canvas>
+  <p class="txt" id="twintxt" aria-label="The GPT's passage"></p>
+</section>
+
+<div class="read" id="read" aria-live="polite">
+  <table>
+    <thead><tr><td></td><th scope="col">diffusion</th><th scope="col">GPT</th></tr></thead>
+    <tbody>
+      <tr><th scope="row">passes</th><td class="d" id="r-pd">–</td><td id="r-pg">255</td></tr>
+      <tr><th scope="row">time in this browser</th><td class="d" id="r-td">–</td><td id="r-tg">–</td></tr>
+      <tr><th scope="row">real words, 50 seeds</th><td class="d" id="r-wd">–</td><td id="r-wg">–</td></tr>
+    </tbody>
+  </table>
+  <p class="note" id="note"></p>
+</div>
+
+<div class="dock" id="dock">
+  <div class="scrub">
+    <label for="step">pass</label>
+    <input type="range" id="step" min="0" max="32" value="0" step="1" disabled aria-describedby="stepout">
+    <output id="stepout" for="step">0 / 32</output>
+  </div>
+  <div class="row">
+    <button id="write">Write</button>
+    <button id="compare" class="ghost">Compare</button>
+    <button id="remask" class="ghost" aria-pressed="true">Remasking</button>
+    <span class="scrub"><label for="k">K</label><input type="range" id="k" min="0" max="4" value="2" step="1" aria-valuetext="32 passes"><output id="kout" for="k">32</output></span>
+  </div>
+</div>
+
+<div class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-h">
+  <button class="close" id="close" aria-label="Close">&times;</button>
+  <h2 id="panel-h" tabindex="-1">How it works</h2>
+  <h3>What you are looking at</h3>
+  <p>The ring is one passage of 256 characters, read clockwise from the top. Position 0 is a line break that both models are given; the other <b>255</b> are written. A blank is a faint smudge. When the diffusion model commits a letter, that position becomes a short brush stroke whose shape is drawn from the letter: vowels curve, consonants stand straight or hook, capitals are longer, punctuation is a dab, a space is a dot and a line break a notch. The set is made up for this page. The newest strokes are blue-violet. A letter the model takes back dissolves to ink and is written again later. The text inside the ring is the same passage, plainly.</p>
+  <h3>Two models, one network</h3>
+  <p>Both are the same transformer, written for this page in PyTorch and trained from scratch on the same text with the same settings. The only differences are the attention mask and the loss.</p>
+  <table>
+    <tr><td></td><th scope="col">diffusion</th><th scope="col">GPT</th></tr>
+    <tr><th scope="row">attention</th><td>both ways</td><td>causal</td></tr>
+    <tr><th scope="row">trained to</th><td>fill in blanks</td><td>predict the next letter</td></tr>
+    <tr><th scope="row">parameters</th><td id="p-pd"></td><td id="p-pg"></td></tr>
+    <tr><th scope="row">validation loss, nats per letter</th><td id="p-vd"></td><td id="p-vg"></td></tr>
+    <tr><th scope="row">training time</th><td id="p-sd"></td><td id="p-sg"></td></tr>
+  </table>
+  <p id="p-arch"></p>
+  <p><b>The diffusion model</b> (absorbing-state masked diffusion, as in MDLM) learns by having a random share of a passage replaced with blanks, anywhere from none to all of it, and guessing them all at once from both sides. Its loss is an upper bound (an ELBO), so its true loss may be lower than the number above: that comparison favours the GPT.</p>
+  <p><b>Writing.</b> The diffusion model runs K passes. Each pass reads all 256 positions and draws a letter for every blank; a random set of those letters is kept, so that after pass <i>s</i> about 255·<i>s</i>/K are written (MDLM's own order). Keeping the letters it was most sure of instead (as LLaDA does) made this small model fill the ring with its safest word, “you you you”, so the page does not. With remasking on, in the middle half of the run a few of the least confident earlier letters go back to blank to be guessed again with more context (confidence-based remasking, after ReMDM). The GPT runs 255 passes, each adding one letter after the last, with a cache so it never rereads. Both sample at temperature 0.8, with the same seed.</p>
+  <h3>The numbers, and how they were measured</h3>
+  <p><b>Passes</b> are network runs, one after another. <b>Time</b> is measured live in this browser: the compute time of each model's run, in a background worker. <b>Real words</b> is the share of the words a model writes (runs of letters) that appear anywhere in tiny-shakespeare, over seeds 1–50, measured with this page's own code and weights, not live.</p>
+  <p id="p-k"></p>
+  <p>The ring is drawn live as the passes are computed, at least 90 ms per pass so it can be watched. <b>Compare</b> replays both runs side by side, one pass per tick, so you see the count of passes, not their cost. The real times are in the readout.</p>
+  <h3>Limits</h3>
+  <p>Fewer passes do not mean faster here. Each diffusion pass reads every position, while a GPT pass reads one new letter, so on a CPU the GPT finishes first. Diffusion pays off only on hardware that runs a whole pass at once, like a GPU, and on models large enough to keep it busy. Both models are under a million parameters with 256 letters of context: they get Shakespeare's shape, not its sense.</p>
+  <p class="keys"><kbd>Space</kbd> write · <kbd>C</kbd> compare · <kbd>&larr;</kbd> <kbd>&rarr;</kbd> step through the passes · <kbd>Esc</kbd> close</p>
+  <div class="refs">
+    <h3>Sources</h3>
+    <p>Subham Sahoo et al., “Simple and Effective Masked Diffusion Language Models” (MDLM), NeurIPS 2024. Aaron Lou, Chenlin Meng and Stefano Ermon, “Discrete Diffusion Modeling by Estimating the Ratios of the Data Distribution” (SEDD), ICML 2024. Shen Nie et al., “Large Language Diffusion Models” (LLaDA), 2025, for the loss weighting and the confidence-ordered unmasking tried here. Guanghan Wang et al., “Remasking Discrete Diffusion Models with Inference-Time Scaling” (ReMDM), 2025.</p>
+    <p>Andrej Karpathy's <a href="https://github.com/karpathy/nanoGPT">nanoGPT</a> (MIT) for the GPT design. nathanrs's <a href="https://github.com/nathanrs/tiny-diffusion">tiny-diffusion</a> (MIT) for the idea of a GPT twin that shares the diffusion model's code; read, not copied. Text: tiny-shakespeare from Karpathy's <a href="https://github.com/karpathy/char-rnn">char-rnn</a> (Shakespeare, public domain). Fonts: Lora and Inter, SIL Open Font License.</p>
+  </div>
+  <p class="credit">Built with Claude for Joe Gao.</p>
+</div>
+
+<p class="sr" id="live" aria-live="polite"></p>
+<div class="fallback" id="fallback"><p>This piece needs JavaScript and Web Workers.</p></div>
+
+<script type="application/octet-stream" id="w-dq">{{W_DIFFUSION_Q8}}</script>
+<script type="application/octet-stream" id="w-df">{{W_DIFFUSION_F32}}</script>
+<script type="application/octet-stream" id="w-gq">{{W_GPT_Q8}}</script>
+<script type="application/octet-stream" id="w-gf">{{W_GPT_F32}}</script>
+<script type="text/plain" id="model-src">{{MODEL_JS}}</script>
+<script>
+"use strict";
+const STATS = {{STATS_JSON}};
+const CHARS = STATS.chars;                 // the 65 characters, index = token id
+const MASK = 65, N = 256, KS = [8, 16, 32, 64, 128];
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = (id) => document.getElementById(id);
+
+// ---------- worker: the models run off the main thread ----------------------------------------
+const WORKER = `
+${$("model-src").textContent}
+let fwd, step;
+onmessage = (e) => {
+  const m = e.data;
+  if (m.type === "init") {
+    fwd = Heptapod.makeForward(Heptapod.load(new Int8Array(m.dq), new Float32Array(m.df)), false);
+    step = Heptapod.makeStepper(Heptapod.load(new Int8Array(m.gq), new Float32Array(m.gf)));
+    postMessage({ type: "ready" });
+  } else if (m.type === "diffuse") {
+    let ms = 0, t = performance.now();
+    Heptapod.diffuse(fwd, m, (r) => {
+      ms += performance.now() - t;
+      postMessage({ type: "dstep", id: m.id, step: r.step, x: r.x, committed: r.committed, remasked: r.remasked, ms });
+      t = performance.now();
+    });
+    postMessage({ type: "ddone", id: m.id, ms });
+  } else if (m.type === "write") {
+    const t = performance.now();
+    const order = [];
+    const x = Heptapod.write(step, m, (r) => order.push(r.char));
+    postMessage({ type: "gdone", id: m.id, x, ms: performance.now() - t });
+  }
+};`;
+function b64(id) {
+  const s = $(id).textContent.trim();
+  if (Uint8Array.fromBase64) return Uint8Array.fromBase64(s).buffer;
+  const bin = atob(s), u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  return u.buffer;
+}
+let worker;
+try {
+  worker = new Worker(URL.createObjectURL(new Blob([WORKER], { type: "text/javascript" })));
+} catch (e) { $("fallback").style.display = "grid"; throw e; }
+
+// ---------- state ------------------------------------------------------------------------------
+const S = {
+  ready: false, id: 0, seed: 1, K: 32, remask: true,
+  traj: [],            // diffusion steps: {x, committed, remasked}
+  dms: null, gms: null, // measured compute times
+  gx: null,            // GPT letters (Uint8Array 256)
+  shown: 0,            // diffusion pass on screen
+  gshown: 0,           // GPT letters on screen
+  live: false, comparing: false, pending: [],
+};
+const pos = Array.from({ length: N }, () => ({ c: MASK, t: -1e9, prev: MASK, tr: -1e9, fresh: false }));
+const gpos = Array.from({ length: N }, () => ({ c: MASK, t: -1e9 }));
+pos[0].c = 0; gpos[0].c = 0;
+
+// ---------- glyphs: one brush stroke per character, generated from the character ---------------
+function hash(s) { let h = 2166136261; for (const ch of s) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+function prng(seed) { let a = seed; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), a | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const GLYPH = CHARS.map((ch) => {
+  const r = prng(hash("heptapod:" + ch)), lo = ch.toLowerCase();
+  const upper = ch !== lo && /[A-Z]/.test(ch);
+  if (ch === " ") return { kind: "dot", dabs: [[3, 0, .7]] };
+  if (ch === "\n") return { kind: "notch" };
+  if (!/[a-z]/i.test(ch)) {                 // punctuation and the rest: one to three dabs
+    const n = 1 + Math.floor(r() * 3), dabs = [];
+    for (let i = 0; i < n; i++) dabs.push([4 + i * 5 + r() * 2, (r() - .5) * 5, 1.2 + r() * 1.1]);
+    return { kind: "dot", dabs };
+  }
+  const vowel = "aeiouy".includes(lo);
+  const L = (vowel ? 13 + r() * 9 : 9 + r() * 17) * (upper ? 1.45 : 1);
+  const bend = vowel ? (r() < .5 ? -1 : 1) * (5 + r() * 6) : (r() - .5) * 5;
+  const lean = (r() - .5) * 7;
+  const w = (1.5 + r() * 1.3) * (upper ? 1.3 : 1);
+  const hook = !vowel && r() < .4 ? { len: 4 + r() * 6, dir: r() < .5 ? -1 : 1 } : null;
+  const bar = upper ? { at: .35 + r() * .4, len: 5 + r() * 4 } : null;
+  return { kind: "stroke", L, bend, lean, w, hook, bar };
+});
+// draw glyph in a local frame: origin at the base point, u = "up" unit vector, v = sideways unit
+function strokePath(ctx, ox, oy, ux, uy, vx, vy, s, L, b1, b2, w, grow) {
+  const P = [[0, 0], [L * .35, b1 * .6], [L * .7, b1], [L, b2]];
+  const n = 14, pts = [];
+  for (let i = 0; i <= n; i++) {
+    const t = (i / n) * grow, mt = 1 - t;
+    const a = mt * mt * mt, b = 3 * mt * mt * t, c = 3 * mt * t * t, d = t * t * t;
+    pts.push([a * P[0][0] + b * P[1][0] + c * P[2][0] + d * P[3][0], a * P[0][1] + b * P[1][1] + c * P[2][1] + d * P[3][1], t]);
+  }
+  const left = [], right = [];
+  for (let i = 0; i <= n; i++) {
+    const p = pts[i], q = pts[Math.min(n, i + 1)], o = pts[Math.max(0, i - 1)];
+    let du = q[0] - o[0], dv = q[1] - o[1]; const len = Math.hypot(du, dv) || 1; du /= len; dv /= len;
+    const t = p[2], ww = w * (0.45 + 0.55 * Math.sin(Math.PI * Math.min(1, t * 1.1 + .05))) * (t > .85 ? (1 - t) / .15 * .7 + .3 : 1);
+    const nu = -dv * ww / 2, nv = du * ww / 2;
+    left.push([p[0] + nu, p[1] + nv]); right.push([p[0] - nu, p[1] - nv]);
+  }
+  const X = (u, v) => ox + (ux * u + vx * v) * s, Y = (u, v) => oy + (uy * u + vy * v) * s;
+  ctx.beginPath();
+  ctx.moveTo(X(left[0][0], left[0][1]), Y(left[0][0], left[0][1]));
+  for (const p of left) ctx.lineTo(X(p[0], p[1]), Y(p[0], p[1]));
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(X(right[i][0], right[i][1]), Y(right[i][0], right[i][1]));
+  ctx.closePath(); ctx.fill();
+  return pts[n];
+}
+function drawGlyph(ctx, c, ox, oy, ux, uy, s, grow) {
+  const g = GLYPH[c], vx = -uy, vy = ux;
+  if (!g) return;
+  if (g.kind === "dot") {
+    for (const [u, v, r] of g.dabs) {
+      if (u / 14 > grow + .2) continue;
+      ctx.beginPath(); ctx.arc(ox + (ux * u + vx * v) * s, oy + (uy * u + vy * v) * s, r * s, 0, 7); ctx.fill();
+    }
+  } else if (g.kind === "notch") {
+    strokePath(ctx, ox, oy, -ux, -uy, -vx, -vy, s, 8, 0, 0, 1.6, grow);
+  } else {
+    const tip = strokePath(ctx, ox, oy, ux, uy, vx, vy, s, g.L, g.bend + g.lean * .5, g.lean, g.w, grow);
+    if (g.hook && grow > .8) {
+      const a = (grow - .8) / .2;
+      const hx = ox + (ux * tip[0] + vx * tip[1]) * s, hy = oy + (uy * tip[0] + vy * tip[1]) * s;
+      strokePath(ctx, hx, hy, vx * g.hook.dir, vy * g.hook.dir, ux, uy, s, g.hook.len * a, 1, 0, g.w * .8, 1);
+    }
+    if (g.bar && grow > g.bar.at) {
+      const u = g.L * g.bar.at, cx = ox + ux * u * s, cy = oy + uy * u * s;
+      strokePath(ctx, cx - vx * g.bar.len * .5 * s, cy - vy * g.bar.len * .5 * s, vx, vy, -ux, -uy, s, g.bar.len, .5, 0, g.w * .7, 1);
+    }
+  }
+}
+
+// ---------- layout ---------------------------------------------------------------------------------
+const ringbox = $("ringbox"), ringC = $("ring"), twinbox = $("twinbox"), twinC = $("twin");
+let L = { R: 200, size: 500, s: 1, mobile: false, dpr: 1 };
+function layout() {
+  const W = innerWidth, H = innerHeight, mobile = W <= 720, short = H <= 500 && W > 720;
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  const head = document.querySelector("header > div").getBoundingClientRect();
+  const dock = $("dock").getBoundingClientRect();
+  document.documentElement.style.setProperty("--dock-h", Math.round(dock.height) + "px");
+  let size, cx, cy;
+  if (mobile) {
+    const avail = H - document.querySelector("header").getBoundingClientRect().bottom - dock.height - 16;
+    size = Math.max(250, Math.min(W - 16, 460, avail));
+    ringbox.style.left = ringbox.style.top = "";
+  } else {
+    const top = short ? 10 : head.bottom + 8, bottom = dock.top - (short ? 6 : 12);
+    const leftW = W * (short ? .5 : .6);
+    size = Math.max(220, Math.min(bottom - top, leftW - 40));
+    cx = short ? W * .47 : Math.max(size / 2 + 32, W * .34);
+    cy = short ? H * .5 : top + (bottom - top) / 2;
+    ringbox.style.left = Math.round(cx - size / 2) + "px";
+    ringbox.style.top = Math.round(cy - size / 2) + "px";
+  }
+  ringbox.style.width = ringbox.style.height = Math.round(size) + "px";
+  ringC.width = ringC.height = Math.round(size * dpr);
+  const R = size * .39;
+  L = { R, size, s: R / 300, mobile, short, dpr };
+  $("passage").style.width = Math.round(R * 1.5) + "px";
+  $("passage").style.fontSize = (mobile ? Math.max(10, R / 15) : Math.min(12.5, Math.max(10.5, R / 24))) + "px";
+  // the twin: right column on desktop, below the ring on phones
+  if (!mobile) {
+    const ringRight = parseFloat(ringbox.style.left) + size;
+    const x0 = short ? ringRight + 16 : Math.max(ringRight + 24, W * .62);
+    const w = short ? Math.min(260, W - x0 - Math.max(24, parseFloat(getComputedStyle(document.querySelector("header")).paddingRight))) : Math.min(440, W - x0 - 32);
+    twinbox.style.width = w + "px";
+    twinbox.style.left = x0 + "px";
+    twinbox.style.display = w < 200 ? "none" : "";
+    const cell = w / 32, avail = dock.top - 16 - (short ? 64 : head.bottom + 24);
+    let f = 3.1, th = 0;
+    for (f of [3.1, 2.7, 2.35, 2.0, 1.7]) {
+      const ch = Math.round(cell * f * 8);
+      twinC.style.height = ch + "px";
+      twinC.width = Math.round(w * dpr); twinC.height = Math.round(ch * dpr);
+      th = twinbox.getBoundingClientRect().height;
+      if (th <= avail) break;
+    }
+    L.rowF = f;
+    const mid = (cy || H / 2) - th / 2;
+    twinbox.style.top = Math.round(short ? 64 : Math.max(head.bottom + 24, Math.min(mid, dock.top - 16 - th))) + "px";
+    L.cell = cell;
+  } else {
+    twinbox.style.display = "";
+  }
+  document.body.classList.add("laid");
+  draw(performance.now());
+}
+
+// ---------- drawing --------------------------------------------------------------------------------
+const INK = "#b5afa5", ACC = "#8a8cff";
+function mix(a, b, t) {
+  const pa = [1, 3, 5].map((i) => parseInt(a.slice(i, i + 2), 16)), pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
+  return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * t)).join(",")})`;
+}
+const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+let animating = false;
+function draw(now) {
+  const ctx = ringC.getContext("2d"), { size, R, s, dpr } = L;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, size, size);
+  const c = size / 2;
+  let busy = false;
+  const GROW = reduce ? 0 : 420, COOL = reduce ? 0 : 900, FADE = reduce ? 0 : 650;
+  // faint guide circle
+  ctx.strokeStyle = "#141414"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(c, c, R, 0, 7); ctx.stroke();
+  for (let i = 0; i < N; i++) {
+    const p = pos[i], th = -Math.PI / 2 + (2 * Math.PI * i) / N;
+    const ux = Math.cos(th), uy = Math.sin(th), ox = c + ux * R, oy = c + uy * R;
+    // a letter being taken back: its stroke dissolves outward
+    const tr = now - p.tr;
+    if (p.prev !== MASK && tr < FADE) {
+      busy = true;
+      const a = 1 - ease(tr / FADE);
+      ctx.globalAlpha = a * .9; ctx.fillStyle = ACC;
+      drawGlyph(ctx, p.prev, ox + ux * (1 - a) * 10 * s, oy + uy * (1 - a) * 10 * s, ux, uy, s, 1);
+      ctx.globalAlpha = 1;
+    }
+    if (p.c === MASK) {
+      ctx.fillStyle = "rgba(181,175,165,.16)";
+      ctx.beginPath(); ctx.arc(ox + ux * 5 * s, oy + uy * 5 * s, 2.6 * s + .6, 0, 7); ctx.fill();
+      continue;
+    }
+    const age = now - p.t;
+    const grow = GROW ? ease(age / GROW) : 1;
+    const cool = p.fresh ? 0 : (COOL ? ease((age - GROW) / COOL) : 1);
+    if (grow < 1 || (cool < 1 && !p.fresh)) busy = true;
+    ctx.fillStyle = p.fresh ? ACC : mix(ACC, INK, cool);
+    ctx.globalAlpha = .92;
+    drawGlyph(ctx, p.c, ox, oy, ux, uy, s, grow);
+    ctx.globalAlpha = 1;
+  }
+  // the plain text ring just inside (desktop only; on a phone it would be too small to read)
+  if (!L.mobile && R > 150) {
+    const rt = R - 13 * Math.max(.8, s);
+    ctx.font = `400 ${Math.max(8, Math.min(10.5, R / 30)).toFixed(1)}px Inter, "Inter fallback", sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let i = 0; i < N; i++) {
+      const p = pos[i]; if (p.c === MASK) continue;
+      const ch = CHARS[p.c]; if (ch === " " || ch === "\n") continue;
+      const th = -Math.PI / 2 + (2 * Math.PI * i) / N;
+      ctx.save();
+      ctx.translate(c + Math.cos(th) * rt, c + Math.sin(th) * rt);
+      ctx.rotate(th + Math.PI / 2);
+      ctx.fillStyle = p.fresh ? ACC : "#6a6660";
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+    }
+  }
+  if (!L.mobile && twinbox.style.display !== "none") busy = drawTwin(now) || busy;
+  animating = busy;
+  if (busy) requestAnimationFrame(draw);
+}
+function kick() { if (!animating) { animating = true; requestAnimationFrame(draw); } }
+
+function drawTwin(now) {
+  const ctx = twinC.getContext("2d"), dpr = L.dpr, cell = L.cell, rowH = cell * L.rowF, s = cell / 15 * Math.min(1, L.rowF / 2.6);
+  const w = twinC.width / dpr, h = twinC.height / dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  let busy = false;
+  for (let i = 1; i < N; i++) {
+    const k = i - 1, row = Math.floor(k / 32), col = k % 32;
+    const ox = col * cell + cell / 2, oy = row * rowH + rowH * .82;
+    const p = gpos[i];
+    if (p.c === MASK) {
+      ctx.fillStyle = "rgba(181,175,165,.13)";
+      ctx.beginPath(); ctx.arc(ox, oy - 4 * s, 2.2 * s + .5, 0, 7); ctx.fill();
+      continue;
+    }
+    const age = now - p.t, grow = reduce ? 1 : ease(age / 260);
+    const fresh = i === S.gshown && S.gshown < N - 1 && S.comparing;
+    if (grow < 1) busy = true;
+    ctx.fillStyle = fresh ? ACC : INK; ctx.globalAlpha = .92;
+    drawGlyph(ctx, p.c, ox, oy, 0, -1, s, grow);
+    ctx.globalAlpha = 1;
+  }
+  return busy;
+}
+
+// ---------- text views -------------------------------------------------------------------------------
+const passage = $("passage"), twintxt = $("twintxt");
+const esc = (ch) => ch === "<" ? "&lt;" : ch === "&" ? "&amp;" : ch === ">" ? "&gt;" : ch;
+function renderPassage() {
+  let h = "";
+  for (let i = 1; i < N; i++) {
+    const p = pos[i];
+    if (p.c === MASK) h += p.prev !== MASK && performance.now() - p.tr < 700 ? `<span class="r">${esc(CHARS[p.prev] === "\n" ? "⏎" : CHARS[p.prev])}</span>` : '<span class="m">·</span>';
+    else h += p.fresh ? `<span class="n">${esc(CHARS[p.c])}</span>` : esc(CHARS[p.c]);
+  }
+  passage.innerHTML = h;
+}
+function renderTwinText() {
+  let h = "";
+  for (let i = 1; i < N; i++) {
+    const p = gpos[i];
+    if (p.c === MASK) continue;
+    h += i === S.gshown && S.comparing && S.gshown < N - 1 ? `<span class="n">${esc(CHARS[p.c])}</span>` : esc(CHARS[p.c]);
+  }
+  twintxt.innerHTML = h || '<span class="hint">Press Compare: it writes the same 255 letters, one per pass, beside a replay of the diffusion run.</span>';
+}
+
+// ---------- showing a diffusion pass -------------------------------------------------------------------
+function showPass(k, animate) {
+  const now = performance.now();
+  if (k === S.shown + 1 && animate) {
+    const r = S.traj[k - 1];
+    for (let i = 1; i < N; i++) pos[i].fresh = false;
+    for (const i of r.remasked) { pos[i].prev = pos[i].c; pos[i].tr = now; pos[i].c = MASK; }
+    for (const i of r.committed) { pos[i].c = r.x[i]; pos[i].t = now; pos[i].fresh = true; pos[i].prev = MASK; }
+  } else {                                   // jump: rebuild the state at pass k without motion
+    const x = k === 0 ? null : S.traj[k - 1].x, fresh = k === 0 ? [] : S.traj[k - 1].committed;
+    for (let i = 1; i < N; i++) { pos[i].c = x ? x[i] : MASK; pos[i].t = -1e9; pos[i].fresh = false; pos[i].prev = MASK; }
+    for (const i of fresh) pos[i].fresh = true;
+    if (k > 0 && k < S.traj.length) for (const i of S.traj[k - 1].remasked) { pos[i].prev = S.traj[k - 2] ? S.traj[k - 2].x[i] : MASK; pos[i].tr = reduce ? -1e9 : now; }
+  }
+  if (k === S.K) for (let i = 1; i < N; i++) pos[i].fresh = false;
+  S.shown = k;
+  const st = $("step");
+  st.max = S.K; st.value = k;
+  $("stepout").textContent = `${k} / ${S.K}`;
+  st.setAttribute("aria-valuetext", `pass ${k} of ${S.K}`);
+  renderPassage();
+  kick();
+}
+function showLetters(n, animate) {
+  const now = performance.now();
+  for (let i = 1; i < N; i++) {
+    const was = gpos[i].c;
+    gpos[i].c = i <= n && S.gx ? S.gx[i] : MASK;
+    if (gpos[i].c !== MASK && was === MASK) gpos[i].t = animate ? now : -1e9;
+  }
+  S.gshown = n;
+  renderTwinText();
+  kick();
+}
+
+// ---------- running ---------------------------------------------------------------------------------
+let tickTimer = null, lastShown = 0;
+const FLOOR = 90, TICK = 60;
+function stopTimers() { clearTimeout(tickTimer); tickTimer = null; }
+
+function write(newSeed) {
+  if (!S.ready) return;
+  stopTimers();
+  if (newSeed) S.seed = 1 + Math.floor(Math.random() * 99999);
+  S.id++; S.traj = []; S.dms = null; S.gms = null; S.gx = null; S.wantCompare = false; S.live = true; S.comparing = false; S.pending = [];
+  showPass(0, false); showLetters(0, false);
+  setBusy(true);
+  updateMeta(); updateRead();
+  worker.postMessage({ type: "diffuse", id: S.id, K: S.K, remask: S.remask, seed: S.seed, temp: 0.8 });
+  worker.postMessage({ type: "write", id: S.id, seed: S.seed, temp: 0.8 });
+  $("live").textContent = `Writing with ${S.K} passes.`;
+}
+function pump() {                            // show live passes no faster than one per FLOOR ms
+  if (tickTimer || !S.pending.length) return;
+  const next = S.pending.shift();
+  if (!reduce) showPass(next, true);
+  tickTimer = setTimeout(() => { tickTimer = null; pump(); finishIfDone(); }, reduce ? 0 : FLOOR);
+}
+function finishIfDone() {
+  if (S.live && S.dms !== null && !S.pending.length && !tickTimer) {
+    S.live = false;
+    if (S.shown !== S.K) showPass(S.K, false);
+    setBusy(false);
+    updateRead();
+    $("live").textContent = `Finished: ${S.K} passes. The passage is in the text inside the ring.`;
+  }
+}
+function compare() {
+  if (!S.ready || S.live || !S.traj.length) return;
+  if (!S.gx) { S.wantCompare = true; return; }   // the GPT's run lands a moment after the diffusion's
+  S.wantCompare = false;
+  stopTimers();
+  S.comparing = true;
+  $("compare").setAttribute("aria-pressed", "true");
+  if (reduce) { showPass(S.K, false); showLetters(N - 1, false); endCompare(); return; }
+  showPass(0, false); showLetters(0, false);
+  let t = 0;
+  const tick = () => {
+    t++;
+    if (t <= S.K) showPass(t, true);
+    showLetters(Math.min(t, N - 1), true);
+    $("twinsub").textContent = `pass ${Math.min(t, N - 1)} of 255 · the diffusion model ${t >= S.K ? "finished at pass " + S.K : "is on pass " + t}`;
+    if (t < N - 1) tickTimer = setTimeout(tick, TICK); else { tickTimer = null; endCompare(); }
+  };
+  tick();
+}
+function endCompare() {
+  S.comparing = false;
+  $("compare").setAttribute("aria-pressed", "false");
+  $("twinsub").textContent = "Same network, causal mask: one letter per pass.";
+  showLetters(N - 1, false);
+  updateRead();
+  $("live").textContent = `Compared: the diffusion model used ${S.K} passes, the GPT 255.`;
+}
+function setBusy(b) {
+  $("write").setAttribute("aria-busy", b ? "true" : "false");
+  $("write").textContent = b ? "Writing" : "Write";
+  $("step").disabled = b; $("compare").disabled = b;
+}
+
+worker.onmessage = (e) => {
+  const m = e.data;
+  if (m.type === "ready") { S.ready = true; write(false); return; }
+  if (m.id !== S.id) return;
+  if (m.type === "dstep") {
+    S.traj.push({ x: m.x, committed: m.committed, remasked: m.remasked });
+    S.pending.push(m.step);
+    pump();
+  } else if (m.type === "ddone") {
+    S.dms = m.ms;
+    if (reduce) { S.pending = []; }
+    finishIfDone();
+    if (reduce) { S.live = true; finishIfDone(); }
+  } else if (m.type === "gdone") {
+    S.gx = m.x; S.gms = m.ms;   // shown only by Compare, one letter per pass
+    showLetters(0, false);
+    if (S.wantCompare) compare();
+  }
+  updateRead();
+};
+
+// ---------- readout --------------------------------------------------------------------------------
+const fmt = (ms) => ms == null ? "…" : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`;
+const pct = (v) => `${Math.round(v * 100)}%`;
+function rates() { return STATS.wordrate[`${S.K}${S.remask ? "r" : ""}`]; }
+function updateRead() {
+  $("r-pd").textContent = S.K;
+  $("r-td").textContent = fmt(S.dms ?? (S.traj.length ? null : null));
+  $("r-tg").textContent = fmt(S.gms);
+  const w = rates();
+  $("r-wd").textContent = w ? pct(w.diffusion) : "–";
+  $("r-wg").textContent = pct(STATS.wordrate.gpt);
+  let note = "";
+  if (S.dms != null && S.gms != null && w) {
+    const x = S.dms / S.gms;
+    note = `Where diffusion is worse: ${w.diffusion < STATS.wordrate.gpt ? `it writes fewer real words (${pct(w.diffusion)} against ${pct(STATS.wordrate.gpt)}), and ` : ""}in this browser it took <b>${x >= 2 ? Math.round(x) + "×" : x.toFixed(1) + "×"}</b> as long, because each of its ${S.K} passes reads all 256 positions while a GPT pass reads one new letter.`;
+  }
+  $("note").innerHTML = note;
+}
+function updateMeta() {
+  $("meta").innerHTML = `<span>${STATS.diffusion.params.toLocaleString("en-US")}</span> parameters each<br><span class="wide">tiny-shakespeare · </span>seed <span>${S.seed}</span> · K <span>${S.K}</span>`;
+}
+function fillPanel() {
+  const d = STATS.diffusion, g = STATS.gpt, mins = (s) => `${Math.round(s / 60)} min`;
+  $("p-pd").textContent = d.params.toLocaleString("en-US"); $("p-pg").textContent = g.params.toLocaleString("en-US");
+  $("p-vd").textContent = `≤ ${d.val_int8.toFixed(2)}`; $("p-vg").textContent = g.val_int8.toFixed(2);
+  $("p-sd").textContent = mins(d.seconds); $("p-sg").textContent = mins(g.seconds);
+  $("p-arch").textContent = `4 layers, 4 heads, 128 wide, 256 letters of context, a 66-symbol vocabulary (65 characters and a blank). Trained ${STATS.train.steps.toLocaleString("en-US")} steps of 64 passages each with AdamW on an ${STATS.train.device}; the best checkpoint by validation loss is kept, then rounded to 8-bit integers (${Math.round((d.q8_bytes + g.q8_bytes) / 1000).toLocaleString("en-US")} kB for both, inside this page).`;
+  const rows = KS.map((k) => { const a = STATS.wordrate[k + "r"], b = STATS.wordrate[String(k)]; return `${k}: ${pct(a.diffusion)}${b ? ` (${pct(b.diffusion)} without remasking)` : ""}`; });
+  $("p-k").textContent = `Real words for the diffusion model by K, the number of passes: ${rows.join("; ")}. The GPT: ${pct(STATS.wordrate.gpt)}. More passes help because fewer letters are committed together, each without seeing the others. As a check against a model that scores well by repeating itself: the share of different words in a sample averages ${STATS.wordrate["32r"].distinct.toFixed(2)} for the diffusion model at K 32 and ${STATS.wordrate.gptDistinct.toFixed(2)} for the GPT.`;
+}
+
+// ---------- controls ---------------------------------------------------------------------------------
+$("write").onclick = () => write(true);
+$("compare").onclick = () => S.comparing ? (stopTimers(), endCompare(), showPass(S.K, false)) : compare();
+$("remask").onclick = () => { S.remask = !S.remask; $("remask").setAttribute("aria-pressed", S.remask); write(false); };
+$("k").oninput = () => {
+  S.K = KS[+$("k").value]; $("kout").textContent = S.K; $("k").setAttribute("aria-valuetext", `${S.K} passes`);
+  updateMeta(); updateRead();
+};
+$("k").onchange = () => write(false);
+$("step").oninput = () => { stopTimers(); if (S.comparing) { S.comparing = false; $("compare").setAttribute("aria-pressed", "false"); } showPass(+$("step").value, false); };
+const panel = $("panel"), made = $("made");
+function setPanel(on) {
+  panel.classList.toggle("on", on); made.setAttribute("aria-expanded", on);
+  if (on) $("panel-h").focus(); else made.focus();
+}
+made.onclick = () => setPanel(!panel.classList.contains("on"));
+$("close").onclick = () => setPanel(false);
+addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && panel.classList.contains("on")) { setPanel(false); return; }
+  if (e.target.closest("input,button,textarea") && e.key !== "Escape") return;
+  if (e.key === " ") { e.preventDefault(); write(true); }
+  else if (e.key === "c" || e.key === "C") compare();
+  else if ((e.key === "ArrowLeft" || e.key === "ArrowRight") && !$("step").disabled) {
+    stopTimers(); showPass(Math.max(0, Math.min(S.K, S.shown + (e.key === "ArrowLeft" ? -1 : 1))), false);
+  }
+});
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(layout, 60); });
+
+// ---------- start --------------------------------------------------------------------------------------
+updateMeta(); fillPanel(); updateRead(); renderPassage(); renderTwinText();
+layout();
+document.fonts && document.fonts.ready.then(layout);
+worker.postMessage({ type: "init", dq: b64("w-dq"), df: b64("w-df"), gq: b64("w-gq"), gf: b64("w-gf") });
+</script>
+</body>
+</html>
