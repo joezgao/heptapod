@@ -6,7 +6,7 @@ Can a language model write a whole passage at once? A tiny **diffusion** languag
 
 ## Open it
 
-`index.html` is the whole piece: one 2.34 MB file with both models' int8 weights inside (1.73 MB gzipped). It needs an internet connection only for two fonts. If your browser blocks local files:
+`index.html` is the whole piece: one 2.35 MB file (2,345,454 bytes) with both models' int8 weights inside (1.73 MB, 1,731,129 bytes, with `gzip -6`; see the evidence table). It needs an internet connection only for two fonts. If your browser blocks local files:
 
 ```bash
 python3 -m http.server 8000   # then open http://localhost:8000/
@@ -33,7 +33,7 @@ python3 -m http.server 8000   # then open http://localhost:8000/
 | best checkpoint | step 19,750 of 20,000 (near-flat at the end) | step 13,000 of 20,000 (no better after; training loss kept falling) |
 | training time, Apple M5 Pro, PyTorch 2.15 on MPS | 19 min | 20 min |
 
-Same data (tiny-shakespeare, 1,115,394 characters, split 90/10), same recipe: AdamW (β 0.9, 0.99, weight decay 0.1 on matrices), lr 2e-3 with a 300-step warmup and cosine decay to 1e-4, batch 64 × 256, dropout 0.1, gradient clipping at 1.0, 20,000 steps, best validation checkpoint kept. Rounding to int8 (one scale per row) changed the validation loss by +0.0005 (diffusion) and +0.0001 (GPT).
+Same data (tiny-shakespeare, 1,115,394 characters, as printed by `train/prepare.py` with the file's sha256; split 90/10 in `train/train.py`), same recipe (the constants at the top of `train/train.py`): AdamW (β 0.9, 0.99, weight decay 0.1 on matrices), lr 2e-3 with a 300-step warmup and cosine decay to 1e-4, batch 64 × 256, dropout 0.1, gradient clipping at 1.0, 20,000 steps, best validation checkpoint kept. Rounding to int8 (one scale per row) changed the validation loss by +0.0005 (diffusion) and +0.0001 (GPT).
 
 **Writing.** Both start after the same given line break and write 255 letters at temperature 0.8.
 - The diffusion model runs K passes over all 256 positions. Each pass draws a letter for every blank and keeps a random set of them, so that round(255·s/K) are written after pass s (random order, as in MDLM's sampler). With remasking on, during the middle half of the run a quarter as many of the least confident earlier letters (confidence as it was when they were written) go back to blank each pass, after ReMDM's confidence-based remasking.
@@ -56,16 +56,16 @@ The GPT: **97.2%** real words (2,382 of 2,451), 0.82 distinct. The distinct-word
 
 **Time.** The page measures each run's compute time live, in a background worker. In headless Chrome on an Apple M5 Pro, seed 1 at K 32 took about 3.6 s for the diffusion model and 0.15 s for the GPT. One diffusion pass reads all 256 positions (about 110 ms here: 3.6 s over 32 passes; 108 ms per pass in Node); a GPT pass reads one new letter. So on a CPU the GPT finishes first. The page says so and claims no other speed.
 
-**Page checks** (2026-11-08, Chrome 157 headless on the M5 Pro, the page served gzipped from localhost):
+**Page checks** (2026-11-08, Chrome 157 headless on the M5 Pro, the page served gzipped from localhost; the four Lighthouse reports are saved in `docs/lighthouse/`, and each records its Lighthouse and Chrome versions):
 
 | check | result |
 |---|---|
 | phone harness `tests/phone.mjs` (iPhone 13, iPhone SE, iPhone 13 landscape with safe-area insets, 375 × 812, 1440 × 900, reduced motion) | PASS: no horizontal scroll, Write on the first screen, How it works opens from a tap 11 px above its text and closes from a tap 15 px off the ×, Compare runs to the end, every control reachable by Tab with a visible ring, 0 console errors; reduced motion shows the finished circle, still |
-| Lighthouse 12.8.2 desktop, simulated throttling | Performance 87, Accessibility 100, Best Practices 100, SEO 100 |
-| Lighthouse mobile, simulated throttling | Performance 57, Accessibility 100, Best Practices 100, SEO 100 |
-| Lighthouse with devtools throttling (desktop / mobile) | Performance 100 / 100 (first paint 0.7 s on mobile) |
+| Lighthouse 12.8.2 desktop, simulated throttling (`docs/lighthouse/desktop-simulated.json`) | Performance 87, Accessibility 100, Best Practices 100, SEO 100 |
+| Lighthouse mobile, simulated throttling (`docs/lighthouse/mobile-simulated.json`) | Performance 57, Accessibility 100, Best Practices 100, SEO 100 |
+| Lighthouse with devtools throttling (`docs/lighthouse/desktop-devtools.json`, `mobile-devtools.json`) | Performance 100 / 100 (first paint 0.6 s on mobile); Accessibility 100 / 100; Best Practices 100 / 96 (mobile: small text); SEO 100 / 100 |
 
-Performance under simulated throttling stays below the 95 target: Lighthouse's simulation waits for the whole 1.73 MB (gzipped) document before first paint, and 1.66 MB of that is the two models' int8 weights, which barely compress (gzip -6 saves 7–8% on the raw int8 files: 827,648 → 771,240 and 759,550 bytes). Real browsers paint the page as it streams, which the devtools-throttled runs show. Moving the weights into a separate file would likely lift the simulated score (not measured), but the piece is one file by design.
+Performance under simulated throttling stays below the 95 target (a known gap, left open: moving the weights out of the single file is Joe's decision). Lighthouse's simulation waits for the whole 1.73 MB (gzipped) document before first paint, and 1.71 MB of that is the two models' weights (int8 plus their float32 scales and LayerNorm parameters, base64 then `gzip -6`: 1,708,958 bytes), which barely compress (`gzip -6` saves 7–8% on the raw int8 files: 827,648 → 771,240 and 759,550 bytes). Real browsers paint the page as it streams, which the devtools-throttled runs show. Moving the weights into a separate file would likely lift the simulated score [unverified: not measured].
 
 ## Limits
 
@@ -89,9 +89,10 @@ Every figure above can be checked against a file in this repository or re-run wi
 | JS against PyTorch | `node tests/probes.mjs` (prints the VERDICT line) |
 | real words, distinct words, the LLaDA-order result | `node tests/wordrate_all.mjs 50` → `weights/wordrate.json`, samples in `tests/wordrate-samples.json`; the LLaDA-order trial was a scratch run (8 seeds) not kept in the repo, re-run by the auditor with the same result |
 | browser times | the readout on the page, measured live; the figures above are from one headless Chrome run on 2026-11-08 and will differ on other machines |
-| file sizes | `wc -c index.html`, `gzip -6 -c index.html \| wc -c` |
+| file sizes, weight bytes | `wc -c index.html`, `gzip -6 -c index.html \| wc -c`, `gzip -6 -c weights/diffusion.q8 \| wc -c`; the 1,708,958-byte figure is the four `weights/*.q8`/`*.f32` files concatenated, base64-encoded as `build.py` does, then `gzip -6` |
+| data size, split, training recipe | `train/prepare.py` (prints 1,115,394 bytes and the sha256), `train/train.py` (split, optimiser, schedule, batch, dropout, clipping, steps) |
 | phone harness | `node tests/phone.mjs <url> [shots-dir]` (needs `puppeteer-core`); screenshots of this run are in `screenshots/` |
-| Lighthouse scores | Lighthouse 12.8.2 CLI against the page served gzipped from localhost on 2026-11-08; reports not kept in the repo |
+| Lighthouse scores, Chrome version | `docs/lighthouse/*.json` (Lighthouse 12.8.2 CLI, Chrome 157, the page served gzipped from localhost, 2026-11-08) |
 | paper titles, authors, venues | checked on arXiv (2406.07524, 2310.16834, 2502.09992, 2503.00307) in `docs/audit-2026-11-08.md` |
 
 ## In this repository
@@ -111,7 +112,8 @@ Every figure above can be checked against a file in this repository or re-run wi
 | `tests/wordrate_all.mjs` | the real-word measure for every setting, seeds 1–50; `tests/wordrate-samples.json` keeps every sample |
 | `tests/phone.mjs` | the family phone harness |
 | `build.py` | inlines the weights, `src/model.js` and the numbers into `index.html` |
-| `docs/audit-2026-11-08.md` | the independent claims audit and the fixes it led to |
+| `docs/audit-2026-11-08.md` | the independent claims audits and the fixes they led to |
+| `docs/lighthouse/` | the four Lighthouse reports quoted above |
 | `screenshots/` | desktop (finished, mid-run at pass 14, Compare, How it works), iPhone 13, iPhone 13 Compare, iPhone SE, landscape, reduced motion |
 
 To rebuild from scratch:
@@ -127,7 +129,7 @@ node tests/wordrate_all.mjs 50
 .venv/bin/python build.py
 ```
 
-MPS training is not bit-for-bit reproducible, so a retrain gives slightly different weights and numbers.
+A retrain on MPS may not reproduce the weights bit for bit, so the numbers could differ slightly [unverified: no retrain was run].
 
 ## Credits and license
 
