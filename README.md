@@ -6,7 +6,7 @@ Can a language model write a whole passage at once? A tiny **diffusion** languag
 
 ## Open it
 
-`index.html` is the whole piece: one 2.35 MB file (2,345,655 bytes) with both models' int8 weights inside (1.73 MB, 1,731,224 bytes, with `gzip -6`; see the evidence table). It needs an internet connection only for two fonts. If your browser blocks local files:
+`index.html` is the whole piece: one 2.35 MB file (2,345,655 bytes) with both models' int8 weights inside; 1.73 MB (1,731,224 bytes) as a whole with `gzip -6` (see the evidence table). It needs an internet connection only for two fonts. If your browser blocks local files:
 
 ```bash
 python3 -m http.server 8000   # then open http://localhost:8000/
@@ -16,7 +16,7 @@ python3 -m http.server 8000   # then open http://localhost:8000/
 - The **pass** scrubber steps through the diffusion run; <kbd>←</kbd> <kbd>→</kbd> do the same.
 - **K** sets the number of passes (8, 16, 32, 64, 128). Fewer passes commit more letters per pass, decided without seeing each other.
 - **Remasking** on or off: with it on, a few of the least confident letters go back to blank in the middle of the run and are written again.
-- **Compare** replays the diffusion run beside the GPT writing the same 255 letters, one network pass per tick.
+- **Compare** replays the diffusion run beside the GPT writing the same number of letters (255), one network pass per tick.
 - **How it works** (top right) explains the method and the numbers; × or <kbd>Esc</kbd> closes it.
 - `prefers-reduced-motion`: no stroke animation; each run jumps to the finished circle, with the scrubber.
 
@@ -33,7 +33,7 @@ python3 -m http.server 8000   # then open http://localhost:8000/
 | best checkpoint | step 19,750 of 20,000 (near-flat at the end) | step 13,000 of 20,000 (no better after; training loss kept falling) |
 | training time, Apple M5 Pro, PyTorch 2.15 on MPS | 19 min | 20 min |
 
-Same data (tiny-shakespeare, 1,115,394 characters, as printed by `train/prepare.py` with the file's sha256; split 90/10 in `train/train.py`), same recipe (the constants at the top of `train/train.py`): AdamW (β 0.9, 0.99, weight decay 0.1 on matrices), lr 2e-3 with a 300-step warmup and cosine decay to 1e-4, batch 64 × 256, dropout 0.1, gradient clipping at 1.0, 20,000 steps, best validation checkpoint kept. Rounding to int8 (one scale per row) changed the validation loss by +0.0005 (diffusion) and +0.0001 (GPT).
+Same data (tiny-shakespeare, 1,115,394 characters, as printed by `train/prepare.py` with the file's sha256; split 90/10 in `train/train.py`), same recipe (the constants at the top of `train/train.py`): AdamW (β 0.9, 0.99, weight decay 0.1 on matrices), lr 2e-3 with a 300-step warmup and cosine decay to 1e-4, batch 64 × 256, dropout 0.1, gradient clipping at 1.0, best validation checkpoint kept; 20,000 steps (the command-line argument; `steps` in `train/logs/*.json`). Rounding to int8 (one scale per row) changed the validation loss by +0.0005 (diffusion) and +0.0001 (GPT).
 
 **Writing.** Both start after the same given line break and write 255 letters at temperature 0.8.
 - The diffusion model runs K passes over all 256 positions. Each pass draws a letter for every blank and keeps a random set of them, so that round(255·s/K) are written after pass s (random order, as in MDLM's sampler). With remasking on, during the middle half of the run a quarter as many of the least confident earlier letters (confidence as it was when they were written) go back to blank each pass, after ReMDM's confidence-based remasking.
@@ -89,7 +89,7 @@ Every figure above can be checked against a file in this repository or re-run wi
 | JS against PyTorch | `node tests/probes.mjs` (prints the VERDICT line) |
 | real words, distinct words, the LLaDA-order result | `node tests/wordrate_all.mjs 50` → `weights/wordrate.json`, samples in `tests/wordrate-samples.json`; the LLaDA-order trial was a scratch run (8 seeds) not kept in the repo, re-run by the auditor with the same result |
 | browser and Node times | `docs/timing-2026-11-08.json` (`node tests/timing.mjs`); the headless Chrome figures are one unsaved run |
-| file sizes, weight bytes | `wc -c index.html`, `gzip -6 -c index.html \| wc -c`, `gzip -6 -c weights/diffusion.q8 \| wc -c`; the 1,708,958-byte figure is the four `weights/*.q8`/`*.f32` files concatenated, base64-encoded as `build.py` does, then `gzip -6` |
+| file sizes, weight bytes | `wc -c index.html`, `gzip -6 -c index.html \| wc -c`, `gzip -6 -c weights/diffusion.q8 \| wc -c`; the 1,708,958-byte figure is the four `weights/*.q8`/`*.f32` files concatenated, base64-encoded, then `gzip -6` (encoding each file separately, as `build.py` does, gives 1,708,975) |
 | data size, split, training recipe | `train/prepare.py` (prints 1,115,394 bytes and the sha256), `train/train.py` (split, optimiser, schedule, batch, dropout, clipping, steps) |
 | phone harness | `node tests/phone.mjs <url> [shots-dir]` (needs `puppeteer-core`); output in `docs/phone-2026-11-08.txt`, screenshots in `screenshots/` |
 | Lighthouse scores, Chrome version | `docs/lighthouse/*.json` (Lighthouse 12.8.2 CLI, Chrome 157, the page served gzipped from localhost, 2026-11-08) |
