@@ -6,7 +6,7 @@ Can a language model write a whole passage at once? A tiny **diffusion** languag
 
 ## Open it
 
-`index.html` is the whole piece: one 2.35 MB file (2,345,454 bytes) with both models' int8 weights inside (1.73 MB, 1,731,129 bytes, with `gzip -6`; see the evidence table). It needs an internet connection only for two fonts. If your browser blocks local files:
+`index.html` is the whole piece: one 2.35 MB file (2,345,655 bytes) with both models' int8 weights inside (1.73 MB, 1,731,224 bytes, with `gzip -6`; see the evidence table). It needs an internet connection only for two fonts. If your browser blocks local files:
 
 ```bash
 python3 -m http.server 8000   # then open http://localhost:8000/
@@ -54,18 +54,18 @@ Same data (tiny-shakespeare, 1,115,394 characters, as printed by `train/prepare.
 
 The GPT: **97.2%** real words (2,382 of 2,451), 0.82 distinct. The distinct-word share is a check that neither model scores by repeating itself.
 
-**Time.** The page measures each run's compute time live, in a background worker. In headless Chrome on an Apple M5 Pro, seed 1 at K 32 took about 3.6 s for the diffusion model and 0.15 s for the GPT. One diffusion pass reads all 256 positions (about 110 ms here: 3.6 s over 32 passes; 108 ms per pass in Node); a GPT pass reads one new letter. So on a CPU the GPT finishes first. The page says so and claims no other speed.
+**Time.** The page measures each run's compute time live, in a background worker. In Node on the same machine (`node tests/timing.mjs`, saved as `docs/timing-2026-11-08.json`), seed 1 at K 32 took 3.39 s for the diffusion model, 106 ms per pass, and 154 ms for the GPT's 255 letters; one headless Chrome run read off the page gave about 3.6 s and 0.15 s [unverified: not saved]. Timings vary from run to run (the second audit measured 4.2 s and 158 ms in Node). One diffusion pass reads all 256 positions; a GPT pass reads one new letter. So on a CPU the GPT finishes first. The page says so and claims no other speed.
 
 **Page checks** (2026-11-08, Chrome 157 headless on the M5 Pro, the page served gzipped from localhost; the four Lighthouse reports are saved in `docs/lighthouse/`, and each records its Lighthouse and Chrome versions):
 
 | check | result |
 |---|---|
-| phone harness `tests/phone.mjs` (iPhone 13, iPhone SE, iPhone 13 landscape with safe-area insets, 375 × 812, 1440 × 900, reduced motion) | PASS: no horizontal scroll, Write on the first screen, How it works opens from a tap 11 px above its text and closes from a tap 15 px off the ×, Compare runs to the end, every control reachable by Tab with a visible ring, 0 console errors; reduced motion shows the finished circle, still |
+| phone harness `tests/phone.mjs`, output saved as `docs/phone-2026-11-08.txt` (iPhone 13, iPhone SE, iPhone 13 landscape with safe-area insets, 375 × 812, 1440 × 900, reduced motion) | PASS: no horizontal scroll, Write on the first screen, How it works opens from a tap 11 px above its text and closes from a tap 15 px off the ×, Compare runs to the end, every control reachable by Tab with a visible ring, 0 console errors; reduced motion shows the finished circle, still |
 | Lighthouse 12.8.2 desktop, simulated throttling (`docs/lighthouse/desktop-simulated.json`) | Performance 87, Accessibility 100, Best Practices 100, SEO 100 |
 | Lighthouse mobile, simulated throttling (`docs/lighthouse/mobile-simulated.json`) | Performance 57, Accessibility 100, Best Practices 100, SEO 100 |
 | Lighthouse with devtools throttling (`docs/lighthouse/desktop-devtools.json`, `mobile-devtools.json`) | Performance 100 / 100 (first paint 0.6 s on mobile); Accessibility 100 / 100; Best Practices 100 / 96 (mobile: small text); SEO 100 / 100 |
 
-Performance under simulated throttling stays below the 95 target (a known gap, left open: moving the weights out of the single file is Joe's decision). Lighthouse's simulation waits for the whole 1.73 MB (gzipped) document before first paint, and 1.71 MB of that is the two models' weights (int8 plus their float32 scales and LayerNorm parameters, base64 then `gzip -6`: 1,708,958 bytes), which barely compress (`gzip -6` saves 7–8% on the raw int8 files: 827,648 → 771,240 and 759,550 bytes). Real browsers paint the page as it streams, which the devtools-throttled runs show. Moving the weights into a separate file would likely lift the simulated score [unverified: not measured].
+Performance under simulated throttling stays below the 95 target (a known gap, left open: moving the weights out of the single file is Joe's decision). Under simulated throttling Lighthouse puts first paint at 1.6 s (desktop) and 9.2 s (mobile), against 0.1 s and 0.6 s with devtools throttling (`docs/lighthouse/`). Our reading is that its simulation counts the whole 1.73 MB (gzipped) document before first paint [unverified: inferred from those numbers, not from Lighthouse's source]; 1.71 MB of that is the two models' weights (int8 plus their float32 scales and LayerNorm parameters, base64 then `gzip -6`: 1,708,958 bytes), which barely compress (`gzip -6` saves 7–8% on the raw int8 files: 827,648 → 771,240 and 759,550 bytes). Real browsers paint the page as it streams, which the devtools-throttled runs show. Moving the weights into a separate file would likely lift the simulated score [unverified: not measured].
 
 ## Limits
 
@@ -88,10 +88,10 @@ Every figure above can be checked against a file in this repository or re-run wi
 | int8 changes the loss by +0.0005 / +0.0001 | `weights/stats.json` (`val_fp32` against `val_int8`) |
 | JS against PyTorch | `node tests/probes.mjs` (prints the VERDICT line) |
 | real words, distinct words, the LLaDA-order result | `node tests/wordrate_all.mjs 50` → `weights/wordrate.json`, samples in `tests/wordrate-samples.json`; the LLaDA-order trial was a scratch run (8 seeds) not kept in the repo, re-run by the auditor with the same result |
-| browser times | the readout on the page, measured live; the figures above are from one headless Chrome run on 2026-11-08 and will differ on other machines |
+| browser and Node times | `docs/timing-2026-11-08.json` (`node tests/timing.mjs`); the headless Chrome figures are one unsaved run |
 | file sizes, weight bytes | `wc -c index.html`, `gzip -6 -c index.html \| wc -c`, `gzip -6 -c weights/diffusion.q8 \| wc -c`; the 1,708,958-byte figure is the four `weights/*.q8`/`*.f32` files concatenated, base64-encoded as `build.py` does, then `gzip -6` |
 | data size, split, training recipe | `train/prepare.py` (prints 1,115,394 bytes and the sha256), `train/train.py` (split, optimiser, schedule, batch, dropout, clipping, steps) |
-| phone harness | `node tests/phone.mjs <url> [shots-dir]` (needs `puppeteer-core`); screenshots of this run are in `screenshots/` |
+| phone harness | `node tests/phone.mjs <url> [shots-dir]` (needs `puppeteer-core`); output in `docs/phone-2026-11-08.txt`, screenshots in `screenshots/` |
 | Lighthouse scores, Chrome version | `docs/lighthouse/*.json` (Lighthouse 12.8.2 CLI, Chrome 157, the page served gzipped from localhost, 2026-11-08) |
 | paper titles, authors, venues | checked on arXiv (2406.07524, 2310.16834, 2502.09992, 2503.00307) in `docs/audit-2026-11-08.md` |
 
@@ -111,9 +111,11 @@ Every figure above can be checked against a file in this repository or re-run wi
 | `tests/probes.mjs` | JS forward pass vs PyTorch on 20 fixed inputs per model |
 | `tests/wordrate_all.mjs` | the real-word measure for every setting, seeds 1–50; `tests/wordrate-samples.json` keeps every sample |
 | `tests/phone.mjs` | the family phone harness |
+| `tests/timing.mjs` | one timed run of each model in Node |
 | `build.py` | inlines the weights, `src/model.js` and the numbers into `index.html` |
 | `docs/audit-2026-11-08.md` | the independent claims audits and the fixes they led to |
 | `docs/lighthouse/` | the four Lighthouse reports quoted above |
+| `docs/phone-2026-11-08.txt`, `docs/timing-2026-11-08.json` | the saved phone-harness output and Node timing |
 | `screenshots/` | desktop (finished, mid-run at pass 14, Compare, How it works), iPhone 13, iPhone 13 Compare, iPhone SE, landscape, reduced motion |
 
 To rebuild from scratch:

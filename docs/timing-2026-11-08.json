@@ -1,0 +1,8 @@
+{
+ "date": "2026-11-08T14:46:08.021Z",
+ "node": "v26.10.0",
+ "cpu": "Apple M5 Pro",
+ "diffusion_K32_ms": 3390,
+ "diffusion_ms_per_pass": 106,
+ "gpt_255_letters_ms": 154
+}
