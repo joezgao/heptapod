@@ -14,6 +14,8 @@ The film's premise, that learning a language rewires how you think, is the stron
 
 ## Open it
 
+**Live:** [joezgao.github.io/heptapod/](https://joezgao.github.io/heptapod/) (nothing to install).
+
 The piece is two files that must sit side by side: `index.html`, the page (61,682 bytes; 20,323 with `gzip -6`), and `weights.js`, both models' int8 weights (2,284,308 bytes; 1,709,111 with `gzip -6`), which loads after the page has painted. It needs an internet connection only for two fonts. If your browser blocks local files:
 
 ```bash
