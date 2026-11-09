@@ -1,0 +1,36 @@
+ok   iphone13  no horizontal scroll  390 <= 390
+ok   iphone13  Write on the first screen
+ok   iphone13  How it works opens from a tap 11 px above
+ok   iphone13  panel closes from a tap 15 px off the x
+ok   iphone13  Compare writes the twin's passage
+ok   iphone13  0 console errors
+ok   iphoneSE  no horizontal scroll  320 <= 320
+ok   iphoneSE  Write on the first screen
+ok   iphoneSE  How it works opens from a tap 11 px above
+ok   iphoneSE  panel closes from a tap 15 px off the x
+ok   iphoneSE  Compare writes the twin's passage
+ok   iphoneSE  0 console errors
+ok   landscape no horizontal scroll  844 <= 844
+ok   landscape Write on the first screen
+ok   landscape How it works opens from a tap 11 px above
+ok   landscape panel closes from a tap 15 px off the x
+ok   landscape Compare writes the twin's passage
+ok   landscape 0 console errors
+ok   m375      no horizontal scroll  375 <= 375
+ok   m375      Write on the first screen
+ok   m375      How it works opens from a tap 11 px above
+ok   m375      panel closes from a tap 15 px off the x
+ok   m375      Compare writes the twin's passage
+ok   m375      0 console errors
+ok   d1440     no horizontal scroll  1440 <= 1440
+ok   d1440     Write on the first screen
+ok   d1440     How it works opens from a tap 11 px above
+ok   d1440     panel closes from a tap 15 px off the x
+ok   d1440     Compare writes the twin's passage
+ok   d1440     every control reachable by Tab
+ok   d1440     focus ring visible
+ok   d1440     0 console errors
+ok   reduced   finished circle, scrubber at the last pass  32/32
+ok   reduced   ring is still (no animation)
+ok   reduced   0 console errors
+VERDICT: PASS
