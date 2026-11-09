@@ -4,6 +4,14 @@
 
 Can a language model write a whole passage at once? A tiny **diffusion** language model starts from 255 blanks and fills them in everywhere over a few passes, drawing each letter as a brush stroke around a circle, and sometimes taking a letter back. Beside it, a **GPT** of exactly the same size, trained on the same text in the same way, writes the same length one letter at a time. Both were trained from scratch on tiny-shakespeare and run live in the browser in plain JavaScript.
 
+## Why heptapods
+
+In Ted Chiang's novella "Story of Your Life" (1998), filmed as *Arrival* (2016), the heptapods have two languages: Heptapod A, spoken one sound after another, and Heptapod B, written as whole sentences drawn at once on a surface, with no order. To draw a sentence that way, a writer must know how it ends before the first stroke.
+
+A GPT writes like Heptapod A, one letter at a time, seeing only what came before. A masked diffusion model looks like Heptapod B: every position fills in together. The difference this page makes visible is that the diffusion model does not know the ending in advance. Letters committed in the same pass cannot see each other, which is why it needs many passes and sometimes takes letters back.
+
+The film's premise, that learning a language rewires how you think, is the strong form of the Sapir–Whorf hypothesis. Its own linguistics consultant, Jessica Coon, rejects that idea for human languages. The page borrows the image, not the claim.
+
 ## Open it
 
 The piece is two files that must sit side by side: `index.html`, the page (61,682 bytes; 20,323 with `gzip -6`), and `weights.js`, both models' int8 weights (2,284,308 bytes; 1,709,111 with `gzip -6`), which loads after the page has painted. It needs an internet connection only for two fonts. If your browser blocks local files:
