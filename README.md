@@ -131,7 +131,7 @@ node tests/wordrate_all.mjs 50
 .venv/bin/python build.py
 ```
 
-A retrain on MPS may not reproduce the weights bit for bit, so the numbers could differ slightly [unverified: no retrain was run].
+A retrain is not guaranteed to match. On 2026-11-09 both models were retrained on the same machine with the committed code and seed (`train/train.py`, 20,000 steps each; best validation loss as logged by the script): the GPT reached 1.436 (the shipped run: 1.447), but the diffusion model reached 2.031 (the shipped run: 1.933), about 5% worse. Validation is deterministic here (same windows and masks; the last ten evaluations of each run vary by 0.004), so the gap is between runs, not noise. Possible causes are run-to-run nondeterminism on MPS or a difference between the code that produced the shipped run and the code committed afterwards [unverified: not isolated]. The shipped weights and every number above come from the original runs.
 
 ## Credits and license
 
