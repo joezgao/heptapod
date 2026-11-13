@@ -252,7 +252,7 @@ main { display: contents; }   /* landmark only: no box, so the layout is unchang
   <p>The ring is drawn live as the passes are computed, at least 90 ms per pass so it can be watched. <b>Compare</b> replays both runs side by side, one pass per tick, so you see the count of passes, not their cost. The real times are in the readout.</p>
   <h3>Limits</h3>
   <p>Fewer passes do not mean faster here. Each diffusion pass reads every position, while a GPT pass reads one new letter, so on a CPU the GPT finishes first. Diffusion can pay off on hardware that runs a whole pass at once, like a GPU, with models large enough to keep it busy; that is not measured here. Both models are under a million parameters with 256 letters of context: they get Shakespeare's shape, not its sense.</p>
-  <p class="keys"><kbd>Space</kbd> write · <kbd>C</kbd> compare · <kbd>&larr;</kbd> <kbd>&rarr;</kbd> step through the passes · <kbd>Esc</kbd> close</p>
+  <p class="keys"><kbd>Space</kbd> write, <kbd>C</kbd> compare, <kbd>&larr;</kbd> <kbd>&rarr;</kbd> step through the passes, <kbd>Esc</kbd> close</p>
   <div class="refs">
     <h3>Sources</h3>
     <p>Subham Sahoo et al., “Simple and Effective Masked Diffusion Language Models” (MDLM), NeurIPS 2024. Aaron Lou, Chenlin Meng and Stefano Ermon, “Discrete Diffusion Modeling by Estimating the Ratios of the Data Distribution” (SEDD), ICML 2024. Shen Nie et al., “Large Language Diffusion Models” (LLaDA), 2025, for the loss weighting and the confidence-ordered unmasking tried here. Guanghan Wang et al., “Remasking Discrete Diffusion Models with Inference-Time Scaling” (ReMDM), 2025.</p>
@@ -949,7 +949,7 @@ function compare() {
     t++;
     if (t <= S.K) showPass(t, true);
     showLetters(Math.min(t, N - 1), true);
-    $("twinsub").textContent = `pass ${Math.min(t, N - 1)} of 255 · the diffusion model ${t >= S.K ? "finished at pass " + S.K : "is on pass " + t}`;
+    $("twinsub").textContent = `pass ${Math.min(t, N - 1)} of 255; the diffusion model ${t >= S.K ? "finished at pass " + S.K : "is on pass " + t}`;
     if (t < N - 1) tickTimer = setTimeout(tick, TICK); else { tickTimer = null; endCompare(); }
   };
   tick();
@@ -1012,7 +1012,7 @@ function updateRead() {
   $("note").innerHTML = note;
 }
 function updateMeta() {
-  $("meta").innerHTML = `<span>${STATS.diffusion.params.toLocaleString("en-US")}</span> parameters each<br><span class="wide">tiny-shakespeare · </span>seed <span>${S.seed}</span> · K <span>${S.K}</span>`;
+  $("meta").innerHTML = `<span>${STATS.diffusion.params.toLocaleString("en-US")}</span> parameters each<br><span class="wide">tiny-shakespeare, </span>seed <span>${S.seed}</span>, K <span>${S.K}</span>`;
 }
 function fillPanel() {
   const d = STATS.diffusion, g = STATS.gpt, mins = (s) => `${Math.round(s / 60)} min`;
