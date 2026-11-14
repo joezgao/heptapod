@@ -144,6 +144,17 @@ node tests/wordrate_all.mjs 50
 
 A retrain is not guaranteed to match. On 2026-11-09 both models were retrained on the same machine with the committed code and seed (`train/train.py`, 20,000 steps each; best validation loss as logged by the script): the GPT reached 1.436 (the shipped run: 1.447), but the diffusion model reached 2.031 (the shipped run: 1.933), about 5% worse. Validation is deterministic here (same windows and masks; the last ten evaluations of each run vary by 0.004), so the gap is between runs, not noise. Possible causes are run-to-run nondeterminism on MPS or a difference between the code that produced the shipped run and the code committed afterwards [unverified: not isolated]. The shipped weights and every number above come from the original runs.
 
+To check the shipped numbers without retraining (Python's standard library and Node only, no PyTorch):
+
+```bash
+python3 train/prepare.py           # the word list comes from the training text
+node tests/probes.mjs              # JS against PyTorch on the shipped weights, a few seconds
+node tests/wordrate_all.mjs 50     # rewrites weights/wordrate.json; about 5 min on 14 cores
+git diff --stat weights tests      # expect no change beyond the last digit of a float
+```
+
+On 2026-11-14 this ran on a clean copy of `main`: probes 1.86e-5 and 1.53e-5, every word count and every sample identical, and three `distinct` values differing only in the 16th significant digit (the order in which parallel jobs are summed).
+
 ## Credits and license
 
 Method: absorbing-state masked diffusion as in MDLM (Sahoo et al., NeurIPS 2024) and SEDD (Lou, Meng and Ermon, ICML 2024); confidence-ordered unmasking as in LLaDA (Nie et al., 2025); confidence-based remasking after ReMDM (Wang et al., 2025). GPT design after Karpathy's [nanoGPT](https://github.com/karpathy/nanoGPT) (MIT). The idea of a GPT twin that shares the diffusion model's code comes from nathanrs's [tiny-diffusion](https://github.com/nathanrs/tiny-diffusion) (MIT); its code was read, not copied. All code here was written for this piece. Training text: tiny-shakespeare from Karpathy's [char-rnn](https://github.com/karpathy/char-rnn) (Shakespeare, public domain). Fonts: Lora and Inter, SIL Open Font License. The brush glyphs are generated for this page and are not taken from any film.
