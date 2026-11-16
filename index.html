@@ -13,6 +13,7 @@
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;1,400&family=Inter:wght@400;500&display=swap"></noscript>
 <style>
 @font-face{font-family:"Inter fallback";src:local("Arial"),local("ArialMT");size-adjust:106.8%;ascent-override:90.4%;descent-override:22.5%;line-gap-override:0%}
+@font-face{font-family:"Inter fallback";src:local("Arial"),local("ArialMT");unicode-range:U+00B7;size-adjust:86.5%;ascent-override:111.6%;descent-override:27.8%;line-gap-override:0%}
 @font-face{font-family:"Lora fallback";font-style:italic;src:local("Georgia Italic"),local("Georgia-Italic");size-adjust:99.7%}
 :root{
   --bg:#000; --fg:#efefef; --dim:#8b8b8b; --mute:#767676; --faint:#3b3b3b; --line:#1c1c1c;
@@ -35,6 +36,7 @@ h1{font-family:var(--serif);font-weight:400;font-style:italic;font-size:30px;let
 .caption b{color:var(--fg);font-weight:500}
 .meta{font-size:11px;letter-spacing:.04em;color:var(--mute);text-align:right;line-height:1.7;white-space:nowrap;font-variant-numeric:tabular-nums}
 .meta span{color:var(--dim)}
+#meta{min-height:3.4em}   /* two lines (line-height 1.7) reserved before the script fills them: no jump at load */
 .made{position:relative;pointer-events:auto;font:inherit;letter-spacing:inherit;color:var(--mute);background:none;border:0;padding:0;margin-top:4px;cursor:pointer;
   border-radius:0;text-decoration:underline;text-decoration-color:#2e2e2e;text-underline-offset:3px;transition:color .25s}
 .made::after{content:"";position:absolute;inset:-13px -8px}
