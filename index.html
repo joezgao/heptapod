@@ -781,7 +781,7 @@ function draw(now) {
   let busy = false;
   const GROW = reduce ? 0 : 420, COOL = reduce ? 0 : 900, FADE = reduce ? 0 : 650;
   // faint guide circle
-  ctx.strokeStyle = "#141414"; ctx.lineWidth = 1;
+  ctx.strokeStyle = "#262626"; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(c, c, R, 0, 7); ctx.stroke();
   for (let i = 0; i < N; i++) {
     const p = pos[i], th = -Math.PI / 2 + (2 * Math.PI * i) / N;
@@ -796,7 +796,7 @@ function draw(now) {
       ctx.globalAlpha = 1;
     }
     if (p.c === MASK) {
-      ctx.fillStyle = "rgba(181,175,165,.16)";
+      ctx.fillStyle = "rgba(181,175,165,.30)";
       ctx.beginPath(); ctx.arc(ox + ux * 5 * s, oy + uy * 5 * s, 2.6 * s + .6, 0, 7); ctx.fill();
       continue;
     }
