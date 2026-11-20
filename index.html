@@ -190,10 +190,12 @@ main { display: contents; }   /* landmark only: no box, so the layout is unchang
   ::selection{background:rgba(128,128,128,.35)}
   button:active:not(:disabled){filter:brightness(.85)}
 </style>
+<style>.jg-home{display:block;width:fit-content;margin:-12px 0 -8px;padding:12px 0;font-size:13px;line-height:20px;letter-spacing:.02em;color:inherit;opacity:.6;text-decoration:underline;text-underline-offset:3px;transition:opacity .2s ease}.jg-home:hover,.jg-home:focus-visible{opacity:1}.jg-home:focus-visible{outline:1px solid currentColor;outline-offset:3px}</style>
 </head>
 <body>
 <header>
   <div>
+    <a class="jg-home" href="https://joezgao.github.io/work/">← Joe Gao</a>
     <h1>Heptapod</h1>
     <p class="caption">Can a language model write a whole passage at once? A tiny <b>diffusion</b> model starts from 255 blanks and fills them in everywhere over a few passes, sometimes taking a letter back. <span class="long">Beside it, a <b>GPT</b> of exactly the same size writes the same length one letter at a time.</span> <span class="wide">Both were trained from scratch on Shakespeare and run here, in your browser.</span></p>
   </div>
